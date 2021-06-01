@@ -16,7 +16,7 @@ computer than just you're favourite browser.
     ![Welcome Window](docs_images/colab_github_part1.png)
 
 2. Click on the GitHub tab and paste the url of this repository
-   <https://github.com/benjaminocampo/AyVD> on the text blank it shows. Then
+   <https://github.com/benjaminocampo/Mentoria> on the text blank it shows. Then
    click on the search button to check which notebooks are saved in this
    repository.
 
@@ -93,7 +93,7 @@ After installing git, you can clone this repository to have a local version of
 it. Open a terminal in the directory you want to save it and run:
 
 ```bash
-git clone https://github.com/benjaminocampo/AyVD.git
+git clone https://github.com/benjaminocampo/Mentoria.git
 ```
 
 #### Setting up a Virtual Environment
@@ -118,9 +118,9 @@ dependencies:
 
 ```
 
-That means that the environment to create has the name diplodatos-mentorship and the
-dependencies are `seaborn=0.11` and the newest versions of `numpy`, `pandas`,
-`matplotlib`, `statsmodels`, `nltk`, and `spacy`.
+That means that the environment to create has the name diplodatos-mentorship and
+the dependencies are `seaborn=0.11` and the newest versions of `numpy`,
+`pandas`, `matplotlib`, `statsmodels`, `nltk`, and `spacy`.
 
 The steps to create a virtual environment with these dependencies are the
 following:
@@ -139,14 +139,14 @@ following:
 3. Activate the environment in order to have available the dependencies with:
 
     ```bash
-    conda activate diplodatos-ayvd
+    conda activate diplodatos-mentoship
     ```
 
     The active environment is also displayed in front of your prompt in
     (parentheses) or [brackets] like this:
 
     ```bash
-    (diplodatos-ayvd)$
+    (diplodatos-mentoship)$
     ```
 
 4. If you don't have installed ipykernel on your system, run:
