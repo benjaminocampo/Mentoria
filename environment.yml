@@ -1,0 +1,9 @@
+name: diplodatos-mentorship
+dependencies:
+  - numpy
+  - pandas
+  - matplotlib
+  - statsmodels
+  - seaborn=0.11
+  - nltk
+  - spacy
