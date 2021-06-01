@@ -102,23 +102,25 @@ In order to install the packages that are necessary to run the notebooks we
 recommend to create a virtual environment so they won't be installed in your
 global system.
 
-Each directory has an `environment.yml` file that lists the dependencies needed
-to run correctly the notebooks inside it. In the case of the `AyVD` directory,
-the content of this file is:
+`environment.yml` file lists the dependencies needed to run correctly the
+notebooks in this repository.
 
 ```yml
-name: diplodatos-ayvd
+name: diplodatos-mentorship
 dependencies:
   - numpy
   - pandas
   - matplotlib
   - statsmodels
   - seaborn=0.11
+  - nltk
+  - spacy
+
 ```
 
-That means that the environment to create has the name diplodatos-ayvd and the
+That means that the environment to create has the name diplodatos-mentorship and the
 dependencies are `seaborn=0.11` and the newest versions of `numpy`, `pandas`,
-`matplotlib`, and `statsmodels`
+`matplotlib`, `statsmodels`, `nltk`, and `spacy`.
 
 The steps to create a virtual environment with these dependencies are the
 following:
@@ -157,7 +159,7 @@ following:
     kernel:
 
     ```bash
-    ipython kernel install --user --name=diplodatos-ayvd
+    ipython kernel install --user --name=diplodatos-mentorship
     ```
 
 5. Run jupyter lab or jupyter notebook with:
