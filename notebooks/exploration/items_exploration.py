@@ -373,3 +373,22 @@ plt.xticks(rotation=30)
 # lado notar como unidades de medida tales como el *kg* son también útiles para
 # este tipo de compras y que salieron a la vista dado por la eliminación de
 # dígitos.
+# %% [markdown]
+# ## Conclusión
+# A pesar de tener una cantidad reducida de variables aleatorias a considerar en
+# el conjunto de datos, la exploración deja en evidencia una basta cantidad de
+# aspectos a analizar por medio de la contabilización de palabras con ciertas
+# propiedades. Se dejó en claro que la ocurrencia de stopwords, dígitos y
+# caracteres especiales a pesar de ser poco frecuentes, palabras cercanas a
+# ellas pueden ser de gran importancia en la publicación de un artículo. También
+# la independencia entre las variables `language` y `label_quality` es de gran
+# valor ya que con ello se podrían realizar test de hipótesis bajo estadísticos
+# que requieren esta suposición y que serían ideales para un futuro análisis. Lo
+# mismo sucede con la lematización del título y la consideración de frecuencias
+# por idioma. Se piensa que con ello se podrían determinar otras palabras
+# relevantes que no aparecieron en esta primera exploración.
+#
+# Otros aspectos importantes del conjunto de datos son la mayor cantidad de
+# etiquetas poco confiables para la categorización de las publicaciones y la
+# poca frecuencia de caracteres no relevantes en los títulos.
+# %%
