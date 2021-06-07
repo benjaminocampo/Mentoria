@@ -42,6 +42,11 @@ stopwords = \
     set(nltk.corpus.stopwords.words("portuguese"))
 
 def proportion(df, by, col):
+    """Returns a dataframe that has:
+        1 The number of rows given by the group formed by @col and @by.
+        2 The number of rows given by the group @by.
+        3 The proportion of 1 related to 2.
+    """
     df_proportion = df.groupby([by, col]) \
         .agg(count=(col, "count")) \
         .join(df.groupby(by).size().to_frame()) \
@@ -51,24 +56,39 @@ def proportion(df, by, col):
     return df_proportion
 
 def count_words(s):
+    """
+    Counts the number of words in the string @s
+    """
     return len(s.split())
 
 def count_stopwords(s):
+    """
+    Counts the number of stopwords in the string @s
+    """
     return sum(
         w.lower() in stopwords for w in word_tokenize(s)
     )
 
 def count_special_chars(s):
+    """
+    Counts the number of special chars in the string @s
+    """
     word_freq = nltk.FreqDist(s)
     special_chars = "-.+,[@_!#$%^&*()<>?/\|}{~:]"
     return sum(word_freq[sc] for sc in special_chars)
 
 def count_digits(s):
+    """
+    Counts the number of digits in the string @s
+    """
     word_freq =  nltk.FreqDist(s)
     digits = "0123456789"
     return sum(word_freq[d] for d in digits)
 
 def remove_unimportant_words(s):
+    """
+    Removes from the string @s all the stopwords, digits, and special chars
+    """
     special_chars = "-.+,[@_!#$%^&*()<>?/\|}{~:]"
     digits = "0123456789"
     invalid_chars = special_chars + digits
