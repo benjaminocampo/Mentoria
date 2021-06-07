@@ -1,4 +1,4 @@
-# Categorizing Publications to Products of Mercado Libre
+# Categorizing Publications of Mercado Libre
 
 ## Updating Notebooks
 
