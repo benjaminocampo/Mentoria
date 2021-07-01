@@ -1,9 +1,26 @@
+# -*- coding: utf-8 -*-
+# ---
+# jupyter:
+#   jupytext:
+#     cell_markers: '"""'
+#     cell_metadata_filter: -all
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.3
+# ---
+
 # %% [markdown]
-#  # Categorización de publicaciones de productos de Mercado Libre
-#
-#  Autores: Maximiliano Tejerina, Eduardo Barseghian, Benjamín Ocampo
+"""
+ # Categorización de publicaciones de productos de Mercado Libre
+
+ Autores: Maximiliano Tejerina, Eduardo Barseghian, Benjamín Ocampo
+"""
 # %% [markdown]
-# ## Funciones y Constantes
+"""
+## Funciones y Constantes
+"""
 # %%
 import pandas as pd
 import numpy
@@ -59,19 +76,26 @@ def prepare_tokenizer(words):
 URL = "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"
 df = pd.read_csv(URL)
 # %% [markdown]
-# ## Limpieza de Texto
-
+"""
+## Limpieza de Texto
+"""
 # %% [markdown]
-# ## Tokenización y Secuencias
-# TODO: Explicar que hace la función o como se realiza el encoding de los
-# títulos.
+"""
+## Tokenización y Secuencias
+TODO: Explicar que hace la función o como se realiza el encoding de los
+títulos.
+"""
 # %%
 encoded_titles = prepare_tokenizer(df.title)
 # %% [markdown]
-# ## Label Encoding
+"""
+## Label Encoding
+"""
 # %%
 le = preprocessing.LabelEncoder()
 encoded_labels = le.fit_transform(df["category"])
 # %% [markdown]
-# ## Word Embeddings
+"""
+## Word Embeddings
+"""
 # %%
