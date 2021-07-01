@@ -58,38 +58,44 @@ category = "category"
 label_quality = "label_quality"
 language = "language"
 
-stopwords = \
-    set(nltk.corpus.stopwords.words("spanish")) | \
+stopwords = (
+    set(nltk.corpus.stopwords.words("spanish")) |
     set(nltk.corpus.stopwords.words("portuguese"))
+)
 
-def proportion(df, by, col):
-    """Returns a dataframe that has: 1 The number of rows given by the group
-        formed by @col and @by. 2 The number of rows given by the group @by. 3
-        The proportion of 1 related to 2.
+
+def proportion(df: pd.DataFrame, by: str, col: str) -> pd.DataFrame:
     """
-    df_proportion = df.groupby([by, col]) \
-        .agg(count=(col, "count")) \
-        .join(df.groupby(by).size().to_frame()) \
-        .rename(columns={0: "total"})
+    Returns a dataframe that has: 1 The number of rows given by the group
+    formed by @col and @by. 2 The number of rows given by the group @by. 3
+    The proportion of 1 related to 2.
+    """
+    df_proportion = (
+        df.groupby([by, col])
+            .agg(count=(col, "count"))
+            .join(df.groupby(by).size().to_frame())
+            .rename(columns={0: "total"})
+    )
 
     df_proportion.loc[:, "proportion"] = df_proportion["count"] / df_proportion["total"]
     return df_proportion
 
-def count_words(s):
+
+def count_words(s: str) -> int:
     """
     Counts the number of words in the string @s
     """
     return len(s.split())
 
-def count_stopwords(s):
+
+def count_stopwords(s: str) -> int:
     """
     Counts the number of stopwords in the string @s
     """
-    return sum(
-        w.lower() in stopwords for w in word_tokenize(s)
-    )
+    return sum(w.lower() in stopwords for w in word_tokenize(s))
 
-def count_special_chars(s):
+
+def count_special_chars(s: str) -> int:
     """
     Counts the number of special chars in the string @s
     """
@@ -97,15 +103,17 @@ def count_special_chars(s):
     special_chars = "-.+,[@_!#$%^&*()<>?/\|}{~:]"
     return sum(word_freq[sc] for sc in special_chars)
 
-def count_digits(s):
+
+def count_digits(s: str) -> int:
     """
     Counts the number of digits in the string @s
     """
-    word_freq =  nltk.FreqDist(s)
+    word_freq = nltk.FreqDist(s)
     digits = "0123456789"
     return sum(word_freq[d] for d in digits)
 
-def remove_unimportant_words(s):
+
+def remove_unimportant_words(s: str) -> str:
     """
     Removes from the string @s all the stopwords, digits, and special chars
     """
@@ -115,13 +123,9 @@ def remove_unimportant_words(s):
 
     reduced_title = ''.join(c for c in s if not c in invalid_chars)
 
-    reduced_title = ' '.join(
-        w.lower() for w in word_tokenize(reduced_title)
-        if not w.lower() in stopwords
-    )
+    reduced_title = ' '.join(w.lower() for w in word_tokenize(reduced_title)
+                             if not w.lower() in stopwords)
     return reduced_title
-
-
 # %%
 df.head(20)
 
@@ -132,49 +136,40 @@ df.head(20)
  por categoría, con la finalidad de verificar si se persibía una diferencia de
  magnitud o variabilidad entre ellas.
 """
-
 # %%
-fig = plt.figure(figsize=(12,8))
+fig = plt.figure(figsize=(12, 8))
 seaborn.countplot(data=df, x='category', color="salmon")
 plt.xticks(rotation=80)
-
 # %% [markdown]
 """
  Notar que no es el caso para este dataset teniendo entre 30600 a 36000 de
  cantidad por cada categoría. Algo también a recalcar es la presencia de títulos
  repetidos para algunas de estas como se muestra en la siguiente tabla.
 """
-
 # %%
 df[[category, title]].groupby(category).describe()
-
 # %% [markdown]
 """
  Si bien la frecuencia de estas repeticiones no es alta (de a lo sumo 2
  repeticiones), se dan en una pequeña fracción de títulos.
 """
-
 # %% [markdown]
 """
  Otro dato de interés es la proporción de publicaciones en español y portugués
  que se obtiene a través de la función `proportion` que determina este resultado
  agrupando por categorías. No obstante, tampoco se obtuvo una gran diferencia.
 """
-
 # %%
 df_language_by_category = proportion(df, category, language).reset_index()
-fig = plt.figure(figsize=(15,7))
-seaborn.barplot(
-    y=df_language_by_category["count"],
-    x=df_language_by_category["category"],
-    hue=df_language_by_category["language"],
-    ci=None
-)
+fig = plt.figure(figsize=(15, 7))
+seaborn.barplot(y=df_language_by_category["count"],
+                x=df_language_by_category["category"],
+                hue=df_language_by_category["language"],
+                ci=None)
 plt.xticks(rotation=70)
 plt.ylabel("Cantidad de publicaciones")
 plt.xlabel("Categorías de publicaciones")
 plt.ticklabel_format(style='plain', axis='y')
-
 # %%
 df_language_by_category
 
@@ -187,32 +182,29 @@ df_language_by_category
 """
 
 # %%
-df_language_by_category[[category, "proportion"]] \
-    .groupby(category) \
-    .agg(
-        min_proportion=("proportion", "min"),
-        max_proportion=("proportion", "max")
-    ).sort_values(by="min_proportion")
-
+(
+    df_language_by_category[[category, "proportion"]]
+        .groupby(category)
+        .agg(
+            min_proportion=("proportion", "min"),
+            max_proportion=("proportion", "max")
+        ).sort_values(by="min_proportion")
+)
 # %% [markdown]
 """
  Si se analiza para el total de publicaciones se obtiene que del total de 646760
  publicaciones, 317768 (49.13%) son en español, 328992 (50.86%) son en
  portugués.
 """
-
 # %%
 nof_items = len(df)
 nof_items
-
 # %%
 nof_spanish_items = len(df[df[language] == "spanish"])
 (nof_spanish_items, nof_spanish_items / nof_items * 100)
-
 # %%
 nof_portugues_items = nof_items - nof_spanish_items
 (nof_portugues_items, nof_portugues_items / nof_items * 100)
-
 # %% [markdown]
 """
  ## Exploración de label quality
@@ -223,41 +215,31 @@ nof_portugues_items = nof_items - nof_spanish_items
  es mayor a 22.2945%. Otras categorías como `WINES` la cantidad de etiquetas
  confiables es incluso menor al 3%.
 """
-
 # %%
 df_label_by_category = proportion(df, category, label_quality).reset_index()
-fig = plt.figure(figsize=(8,6))
-seaborn.barplot(
-    y=df_label_by_category["count"],
-    x=df_label_by_category["category"],
-    hue=df_label_by_category["label_quality"],
-    ci=None
-)
+fig = plt.figure(figsize=(8, 6))
+seaborn.barplot(y=df_label_by_category["count"],
+                x=df_label_by_category["category"],
+                hue=df_label_by_category["label_quality"],
+                ci=None)
 plt.xticks(rotation=90)
 plt.ticklabel_format(style='plain', axis='y')
-
 # %%
 df_label_by_category.sort_values(by="proportion")
-
-
 # %% [markdown]
 """
  Nuevamente para el total de publicaciones, solamente el 94882 (14.67%) son
  `reliable` y 551878 (85.32%) son `unreliable`.
 """
-
 # %%
 nof_items = len(df)
 nof_items
-
 # %%
 nof_reliable_labels = len(df[df[label_quality] == "reliable"])
 (nof_reliable_labels, nof_reliable_labels / nof_items * 100)
-
 # %%
 nof_unreliable_labels = nof_items - nof_reliable_labels
 (nof_unreliable_labels, nof_unreliable_labels / nof_items * 100)
-
 # %% [markdown]
 """
  ## Relación entre el label quality y el idioma
@@ -265,11 +247,9 @@ nof_unreliable_labels = nof_items - nof_reliable_labels
  portugués, por ello se optó por calcular la proporción de estas pero agrupadas
  por idioma.
 """
-
 # %%
 df_label_by_language = proportion(df, language, label_quality)
 df_label_by_language
-
 # %% [markdown]
 """
  Las proporciones de `reliable` para portugués y para español son parecidas, de
@@ -278,13 +258,11 @@ df_label_by_language
  variables `language` y `label_quality`. Si se toman los cantidades de la
  columna `count`, tenemos cuatro casos posibles:
 """
-
 # %%
 pd.crosstab(
     df[language],
     df[label_quality]
 )
-
 # %% [markdown]
 """
  Las variables aleatorias $X_{A}$ y $X_{B}$ asociadas a las poblaciones
@@ -298,40 +276,32 @@ pd.crosstab(
  esas probabilidades. Para ello, se considera la cantidad publicaciones en la
  muestra que adoptan el valor $x_A$, `nof_A`
 """
-
 # %%
 nof_items = len(df)
 nof_A = df.groupby(language).size()
 nof_A
-
 # %% [markdown]
 """
  Similarmente la cantidad de publicaciones que adoptan el valor $x_B$, `nof_B`
 """
-
 # %%
 nof_B = df.groupby(label_quality).size()
 nof_B
-
 # %% [markdown]
 """
  Luego aquellas que coinciden en $x_A$ y $x_B$, `nof_AB`
 """
-
 # %%
 nof_AB = df_label_by_language["count"]
 nof_AB
-
 # %% [markdown]
 """
  Luego se divide entre la cantidad de publicaciones para finalmente obtener
 """
-
 # %%
 # First divide between @nof_B and @nof_AB * nof_items so a dataframe of shape
 # @nof_AB is obtained
 nof_A * (nof_B / (nof_AB * nof_items))
-
 # %% [markdown]
 """
  Como los valores son todos muy cercanos a 1, se puede concluir que `language` y
@@ -343,46 +313,37 @@ nof_A * (nof_B / (nof_AB * nof_items))
 """
 
 # %%
-nof_reliables = len(df[df[label_quality] =="reliable"])
+nof_reliables = len(df[df[label_quality] == "reliable"])
 nof_items = len(df)
 
 df_label_by_language = df_label_by_language.reset_index()
 cols = list(df_label_by_language.columns)
 
-both_reliable=[
-    "both",
-    "reliable",
-    nof_reliables,
-    nof_items,
-    nof_reliables/nof_items
+both_reliable = [
+    "both", "reliable", nof_reliables, nof_items, nof_reliables / nof_items
 ]
-both_unreliable=[
-    "both",
-    "unreliable",
-    nof_items - nof_reliables,
-    nof_items,
-    (nof_items - nof_reliables)/nof_items
+both_unreliable = [
+    "both", "unreliable", nof_items - nof_reliables, nof_items,
+    (nof_items - nof_reliables) / nof_items
 ]
 
 # %%
 df_label_by_language = df_label_by_language.append(
-    {label:value for label, value in zip(cols, both_reliable)},
-    ignore_index=True
-)
+    {label: value
+     for label, value in zip(cols, both_reliable)},
+    ignore_index=True)
 df_label_by_language = df_label_by_language.append(
-    {label:value for label, value in zip(cols, both_unreliable)},
-    ignore_index=True
-)
+    {label: value
+     for label, value in zip(cols, both_unreliable)},
+    ignore_index=True)
 df_label_by_language
 
 # %%
-fig = plt.figure(figsize=(10,6))
-seaborn.barplot(
-    y=df_label_by_language["proportion"],
-    x=df_label_by_language["language"],
-    hue=df_label_by_language["label_quality"],
-    ci=None
-)
+fig = plt.figure(figsize=(10, 6))
+seaborn.barplot(y=df_label_by_language["proportion"],
+                x=df_label_by_language["language"],
+                hue=df_label_by_language["label_quality"],
+                ci=None)
 plt.xticks(rotation=30)
 plt.ylabel("Proporción Reliable vs Unreliable")
 plt.xlabel("Idioma")
@@ -400,18 +361,18 @@ plt.ticklabel_format(style='plain', axis='y')
 """
 
 # %%
-df_analysis_of_words = df[title] \
-    .agg([
-        count_words,
-        count_stopwords,
-        count_digits,
-        count_special_chars
-    ]).join(df[[title, category]])
+df_analysis_of_words = (
+    df[title]
+        .agg([
+            count_words,
+            count_stopwords,
+            count_digits,
+            count_special_chars])
+        .join(df[[title, category]])
+)
 df_analysis_of_words
-
 # %%
 df_analysis_of_words.describe()
-
 # %% [markdown]
 """
  Notar que se tiene en promedio un total de 7.52 palabras por título. En cuanto
@@ -421,32 +382,29 @@ df_analysis_of_words.describe()
  la cantidad de caracteres especiales usados. Sin embargo, se dan algunos
  valores atípicos como el uso de 38 caracteres especiales en una publicación.
 """
-
 # %% [markdown]
 """
  Para conocer la cantidad de palabras con las que se cuenta por categoría se
  utiliza el data frame anterior para calcular el promedio de ellas.
 """
-
 # %%
 df_analysis_of_words.groupby(category).describe()
-
 # %%
-fig = plt.figure(figsize=(12,8))
+fig = plt.figure(figsize=(12, 8))
 seaborn.barplot(
-    data=df_analysis_of_words.groupby(category).mean().reset_index(),
+    data=(df_analysis_of_words
+        .groupby(category)
+        .mean()
+        .reset_index()),
     x=category,
     y="count_words",
-    color="salmon"
-)
+    color="salmon")
 plt.xticks(rotation=80)
-
 # %% [markdown]
 """
  Nuevamente no hay una disparidad fuerte entre la cantidad de palabras usadas en
  el título por las categoría.
 """
-
 # %% [markdown]
 """
 Para concluir el análisis se decidió considerar no solo la cantidad de palabras
@@ -463,39 +421,32 @@ solamente al español o al portugués llevando así a dar lugar a palabras
 frecuentes que tengan misma traducción. El siguiente data frame muestra estos
 resultados (La operación puede llevar unos segundos).
 """
-
 # %%
-df_word_freq = df[title]\
-    .apply(remove_unimportant_words) \
-    .to_frame() \
-    .join(df[category]) \
-    .groupby(category) \
-    .agg(" ".join)[title] \
-    .apply(lambda s: nltk.FreqDist(word_tokenize(s)).most_common(10)) \
-    .to_frame() \
-    .rename(columns={"title":"top10_word_freq"}) \
-    .reset_index()
+df_word_freq = (
+    df[title]
+        .apply(remove_unimportant_words)
+        .to_frame()
+        .join(df[category])
+        .groupby(category)
+        .agg(" ".join)[title]
+        .apply(lambda s: nltk.FreqDist(word_tokenize(s)).most_common(10))
+        .to_frame()
+        .rename(columns={"title":"top10_word_freq"})
+        .reset_index()
+)
 df_word_freq
-
 # %% [markdown]
 """
  Finalmente, si se elige alguna categoría en particular, por ejemplo
  `BABY_CAR_SEATS`, podemos obtener el siguiente gráfico de frecuencia.
 """
-
 # %%
-all_fdist = pd.Series(dict(
-    df_word_freq[
-        df_word_freq["category"] == "BABY_CAR_SEATS"
-    ]["top10_word_freq"][0])
-)
+all_fdist = pd.Series(
+    dict(df_word_freq[df_word_freq["category"] == "BABY_CAR_SEATS"]
+         ["top10_word_freq"][0]))
 plt.figure(figsize=(20, 10))
-seaborn.barplot(
-    x=all_fdist.index,
-    y=all_fdist.values
-)
+seaborn.barplot(x=all_fdist.index, y=all_fdist.values)
 plt.xticks(rotation=30)
-
 # %% [markdown]
 """
  Claramente palabras como *auto*, *kg*, *butaca*, *bebe*, *huevito*, etc,
@@ -505,7 +456,6 @@ plt.xticks(rotation=30)
  este tipo de compras y que salieron a la vista dado por la eliminación de
  dígitos.
 """
-
 # %% [markdown]
 """
 ## Conclusión
@@ -526,5 +476,4 @@ plt.xticks(rotation=30)
  etiquetas poco confiables para la categorización de las publicaciones y la poca
  frecuencia de caracteres no relevantes en los títulos.
 """
-
 # %%
