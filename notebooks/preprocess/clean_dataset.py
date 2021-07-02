@@ -26,7 +26,8 @@ import pandas as pd
 import re
 from nltk import (download, corpus, tokenize)
 from unidecode import unidecode
-from keras import preprocessing
+from sklearn.preprocessing import LabelEncoder
+from keras.preprocessing import (text, sequence)
 
 download("stopwords")
 download('punkt')
@@ -86,21 +87,21 @@ TODO: Explicar que hace la función o como se realiza el encoding de los
 títulos.
 """
 # %%
-word_tokenizer = preprocessing.text.Tokenizer()
+word_tokenizer = text.Tokenizer()
 word_tokenizer.fit_on_texts(df["cleaned_title"])
 # %%
 word_tokenizer.word_counts
 # %%
 word_tokenizer.word_index
 # %%
-nof_rep_out_of_vocab = 1
-vocab_size = len(word_tokenizer.word_index) + nof_rep_out_of_vocab
+nof_out_of_vocab_rep = 1
+vocab_size = len(word_tokenizer.word_index) + nof_out_of_vocab_rep
 # %%
 encoded_sentences = word_tokenizer.texts_to_sequences(df["cleaned_title"])
 # %%
 encoded_sentences[:5]
 # %%
-encoded_sentences = preprocessing.sequence.pad_sequences(encoded_sentences,
+encoded_sentences = sequence.pad_sequences(encoded_sentences,
                                                          padding='post')
 # %%
 encoded_sentences[:5]
@@ -109,8 +110,11 @@ encoded_sentences[:5]
 ## Label Encoding
 """
 # %%
-le = preprocessing.LabelEncoder()
+le = LabelEncoder()
 encoded_labels = le.fit_transform(df["category"])
+encoded_labels
+# %%
+le.classes_
 # %% [markdown]
 """
 ## Word Embeddings
