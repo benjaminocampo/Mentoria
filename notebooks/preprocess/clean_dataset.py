@@ -23,55 +23,51 @@
 """
 # %%
 import pandas as pd
-import numpy
-import nltk
+import re
+from nltk import (download, corpus, tokenize)
 from unidecode import unidecode
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from sklearn import preprocessing
-from keras.preprocessing.text import Tokenizer
-from keras.preprocessing.sequence import pad_sequences
-# %%
-nltk.download("stopwords")
-nltk.download('punkt')
+from keras import preprocessing
 
-stopwords = \
-    set(nltk.corpus.stopwords.words("spanish")) | \
-    set(nltk.corpus.stopwords.words("portuguese"))
+download("stopwords")
+download('punkt')
+
+stopwords = (set(corpus.stopwords.words("spanish")) |
+             set(corpus.stopwords.words("portuguese")))
 
 
-def remove_unimportant_words(s):
+def clean_text(s: str) -> str:
     """
-    Removes from the string @s all the stopwords, digits, and special chars
+    Given a string @s the following parsing is performed:
+        - Removes non-ascii characters.
+        - Removes numbers and special symbols.
+        - Expand common contractions.
+        - Removes stopwords.
     """
-    special_chars = "-.+,[@_!#$%^&*()<>?/\|}{~:]"
-    digits = "0123456789"
-    invalid_chars = special_chars + digits
+    numbers = r"\d+"
+    symbols = r"[^a-zA-Z ]"
+    # TODO: See if we can find more contractions.
+    contractions = [
+        ("c/u", "cada uno"),
+        ("c/", "con"),
+        ("p/", "para"),
+    ]
+    # TODO: Can we avoid chaining assignments? Maybe function composition.
+    s = unidecode(s)
+    s = s.lower()
+    for expression, replacement in contractions:
+        s = s.replace(expression, replacement)
+    s = re.sub(numbers, "", s)
+    s = re.sub(symbols, "", s)
+    s = ' '.join(w for w in tokenize.word_tokenize(s) if not w in stopwords)
+    return s
 
-    reduced_title = ''.join(c for c in s if not c in invalid_chars)
-
-    reduced_title = ' '.join(w.lower() for w in word_tokenize(reduced_title)
-                             if not w.lower() in stopwords)
-    return reduced_title
-
-
-def expand_contractions(s):
-    title = s
-    contractions = {" c/u ": "cada uno", " p/": "para", " c/": "con"}
-    for key, value in contractions.items():
-        title = title.split(key)
-        title = value.join(title)
-    return title
-
-def prepare_tokenizer(words):
-    """
-    funcion que genera un vocabulario, toma una lista de palabras.
-    retorna una lista de palabras tokenizadas.
-    """
-    t = Tokenizer(filters='-.+,[@_!#$%^&*()<>?/\|}{~:]0123456789', lower=True)
-    t.fit_on_texts(words)
-    encoded_docs = t.texts_to_sequences(words)
-    return pad_sequences(encoded_docs)
+#
+# def prepare_tokenizer(s):
+#     word_tokenizer = Tokenizer()
+#     word_tokenizer.fit_on_texts(s)
+#     encoded_docs = t.texts_to_sequences()
+#     return pad_sequences(encoded_docs)
+#
 # %%
 URL = "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"
 df = pd.read_csv(URL)
@@ -79,6 +75,10 @@ df = pd.read_csv(URL)
 """
 ## Limpieza de Texto
 """
+# %%
+df = df.assign(cleaned_title=df["title"].apply(clean_text))
+# %%
+df[["title", "cleaned_title"]]
 # %% [markdown]
 """
 ## Tokenización y Secuencias
@@ -86,7 +86,24 @@ TODO: Explicar que hace la función o como se realiza el encoding de los
 títulos.
 """
 # %%
-encoded_titles = prepare_tokenizer(df.title)
+word_tokenizer = preprocessing.text.Tokenizer()
+word_tokenizer.fit_on_texts(df["cleaned_title"])
+# %%
+word_tokenizer.word_counts
+# %%
+word_tokenizer.word_index
+# %%
+nof_rep_out_of_vocab = 1
+vocab_size = len(word_tokenizer.word_index) + nof_rep_out_of_vocab
+# %%
+encoded_sentences = word_tokenizer.texts_to_sequences(df["cleaned_title"])
+# %%
+encoded_sentences[:5]
+# %%
+encoded_sentences = preprocessing.sequence.pad_sequences(encoded_sentences,
+                                                         padding='post')
+# %%
+encoded_sentences[:5]
 # %% [markdown]
 """
 ## Label Encoding
