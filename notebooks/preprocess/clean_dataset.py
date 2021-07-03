@@ -13,29 +13,29 @@
 
 # %% [markdown]
 """
- # Categorización de publicaciones de productos de Mercado Libre
+# Categorización de publicaciones de productos de Mercado Libre
 
- Autores: Maximiliano Tejerina, Eduardo Barseghian, Benjamín Ocampo
+Autores: Maximiliano Tejerina, Eduardo Barseghian, Benjamín Ocampo
 
- En `items_exploration.ipynb` se trabajó sobre un conjunto reducido de títulos
- de publicaciones de Mercado Libre etiquetadas, donde se analizaron
- confiabilidad de las etiquetas, frecuencia de palabras, y dependencia de
- variables, con el objetivo de obtener información que influya en la predicción
- de la categoría más adecuada de un producto dado el título de la publicación.
- Con el fin de utilizar modelos de *machine learning* en esta tarea, es
- necesario primero realizar una codificación de los datos tabulados. Por ende,
- esta notebook analiza los distintos pasos necesarios para obtener una matriz
- resultante que pueda ser evaluada en modelos de clasificación.
+En `items_exploration.ipynb` se trabajó sobre un conjunto reducido de títulos
+etiquetados de publicaciones de Mercado Libre, donde se analizó la
+confiabilidad de las etiquetas, frecuencia de palabras, y dependencia de
+variables, con el objetivo de obtener información que influya en la predicción
+de la categoría más adecuada de un producto dado el título de su publicación.
+Con el fin de utilizar modelos de *machine learning* en esta tarea, es
+necesario realizar una codificación de los datos tabulados. Por ende, esta
+notebook analiza los distintos pasos necesarios para obtener una matriz
+resultante que pueda ser evaluada en modelos de clasificación.
 """
 # %% [markdown]
 """
 ## Definición de funciones y constantes *helper*
 
 Al igual que en la exploración, se definen algunas funcionalidades que serán de
-utilidad durante la codificación pero que no son muy relevantes para el
+utilidad durante la codificación, pero que no son muy relevantes para el
 seguimiento de este trabajo. No obstante, con el fin de mantener la
 reproducibilidad con herramientas *online* tales como `Google Colab`, son
-matenidas en una sección dentro de esta notebook.
+mantenidas en una sección dentro de esta notebook.
 """
 # %%
 import pandas as pd
@@ -92,6 +92,7 @@ catalogar dichas publicaciones. De manera similar ocurre con caracteres
 especiales, números, e incluso artículos o proposiciones. Por ende, se procedió
 a realizar un preprocesamiento de cada uno de los títulos donde se reemplazan:
 
+ - Mayúsculas por minúsculas.
  - Caracteres que no tienen una codificación ascii.
  - Números y símbolos.
  - Contracciones de palabras por su expresión completa.
@@ -119,7 +120,7 @@ word_tokenizer = text.Tokenizer()
 word_tokenizer.fit_on_texts(df["cleaned_title"])
 # %% [markdown]
 """
-Esta identificación de palabras o tokens es realizada por una instancia de la
+Esta identificación de palabras o *tokens* es realizada por una instancia de la
 clase `Tokenizer` de `Keras` a partir de `fit_on_texts` dando lugar a algunas
 propiedades y métodos, como la cantidad de oraciones utilizadas, frecuencia de
 palabras, y orden por tokens más frecuentes.
@@ -131,7 +132,7 @@ word_tokenizer.word_index
 # %% [markdown]
 """
 En este caso, el atributo `word_index` muestra el vocabulario obtenido, donde a
-cada palabra se le hes asignado un único índice en base a su frecuencia dada por
+cada palabra se le asigna un único índice según su frecuencia dada por
 `word_counts`. Por ejemplo, el *token* `maquina` tiene mayor frecuencia que
 todas las palabras en el vocabulario y por ende se le asigna el índice 1, luego
 les siguen `x` con el índice 2, y así sucesivamente.
@@ -141,16 +142,17 @@ encoded_titles = word_tokenizer.texts_to_sequences(df["cleaned_title"])
 encoded_titles[:5]
 # %% [markdown]
 """
-En base a esto, se codificaron los títulos asignandole un vector correspondiente
-a los índices de cada una de las palabras que lo componen por medio de
-`texts_to_sequences`. Por ejemplo, el título `galoneira semi industrial` se le
-asigna el vector `[576, 186, 40]` ya que `galoneira`, `semi`, e `industrial` son
-las palabras 576, 186, y 40 más frecuente del vocabulario. Los índices de cada
-palabra pueden verificarse en `word_tokenizer.word_index`.
+Basándose en esto, se codificaron los títulos asignándole un vector
+correspondiente a los índices de cada una de las palabras que lo componen por
+medio de `texts_to_sequences`. Por ejemplo, el título `galoneira semi
+industrial` se le asigna el vector `[576, 186, 40]`, ya que `galoneira`, `semi`,
+e `industrial` son las palabras 576, 186, y 40 más frecuente del vocabulario, es
+decir, `word_index[galoneira] = 576`, `word_index[semi] = 186`, y
+`word_index[industrial] = 40`.
 
 Ahora bien, los vectores obtenidos tienen largos distintos según la cantidad de
 palabras que un título presente. Dado que un modelo requiere datos de entrada de
-una dimensión concreta, se rellenó con 0's los vectores de representación de las
+una dimensión concreta, se rellenó con 0’s los vectores de representación de las
 palabras hasta obtener una longitud en común.
 """
 # %%
@@ -178,9 +180,9 @@ le.classes_
 `encoded_labels` corresponde a la misma columna de datos `category` del
 *dataframe* `df` con la diferencia de haber reemplazado cada etiqueta por un
 número entre 0 y el total de categorías. Luego, en caso de querer realizar el
-paso inverso de decodificación puede optar por usar el método
-`inverse_transorme` del códificador `le`. Por ejemplo, la etiqueta cuyo índice
-es 15 corresponde con `SEWING_MACHINES`.
+paso inverso de decodificación se puede usar el método `inverse_transorme` del
+codificador `le`. Por ejemplo, la etiqueta cuyo índice es 15 corresponde con
+`SEWING_MACHINES`.
 """
 # %%
 le.inverse_transform([15])
