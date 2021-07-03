@@ -38,10 +38,16 @@ reproducibilidad con herramientas *online* tales como `Google Colab`, son
 mantenidas en una sección dentro de esta notebook.
 """
 # %%
+from numpy.lib.npyio import save
 import pandas as pd
+import tensorflow as tf
 import re
-from keras.layers.embeddings import Embedding
-from keras.preprocessing import (text, sequence)
+import io
+# keras libraries
+from keras import Sequential
+from keras.layers import Dense, Flatten, embeddings
+from keras.preprocessing import text, sequence
+# preprocessing libraries
 from nltk import (download, corpus, tokenize)
 from sklearn.preprocessing import LabelEncoder
 from unidecode import unidecode
@@ -54,6 +60,7 @@ stopwords = (set(corpus.stopwords.words("spanish")) |
 
 URL = "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"
 df = pd.read_csv(URL)
+
 
 def clean_text(s: str) -> str:
     """
@@ -80,6 +87,19 @@ def clean_text(s: str) -> str:
     s = re.sub(symbols, "", s)
     s = ' '.join(w for w in tokenize.word_tokenize(s) if not w in stopwords)
     return s
+
+
+def save_embedding(vocab, weights):
+    out_vectors = io.open('vectors.tsv', 'w', encoding='utf-8')
+    out_metadata = io.open('metadata.tsv', 'w', encoding='utf-8')
+
+    for index, word in enumerate(vocab):
+        if index != 0:
+            vec = weights[index]
+            out_vectors.write('\t'.join([str(x) for x in vec]) + "\n")
+            out_metadata.write(word + "\n")
+    out_vectors.close()
+    out_metadata.close()
 # %% [markdown]
 """
 ## Limpieza de Texto
@@ -146,7 +166,8 @@ correspondiente a los índices de cada una de las palabras que lo componen por
 medio de `texts_to_sequences`. Por ejemplo, el título `galoneira semi
 industrial` se le asigna el vector `[576, 186, 40]`, ya que `galoneira`, `semi`,
 e `industrial` son las palabras 576, 186, y 40 más frecuente del vocabulario, es
-decir:
+decir, dichos números son los índices asignados a cada una de esas palabras como
+puede a través de la siguiente celda.
 """
 # %%
 (
@@ -158,8 +179,8 @@ decir:
 """
 Ahora bien, los vectores obtenidos tienen largos distintos según la cantidad de
 palabras que un título presente. Dado que un modelo requiere datos de entrada de
-una dimensión concreta, se rellenó con 0’s los vectores de representación de las
-palabras hasta obtener una longitud en común.
+una dimensión concreta, se rellenó con 0’s los vectores de representación hasta
+obtener una longitud en común.
 """
 # %%
 encoded_titles = sequence.pad_sequences(encoded_titles, padding='post')
@@ -195,20 +216,78 @@ le.inverse_transform([15])
 # %% [markdown]
 """
 ## *Word Embeddings*
+
+En la sección anterior se representaron los títulos de las publicaciones por
+medio de vectores densos, donde una palabra era representada por el índice $i$,
+si esta era la $i-ésima$ palabra más frecuente. No obstante, también se pueden
+representar las palabras por medio de vectores que mantengan su semántica, es
+decir, aquellas que tengan un significado similar, tendrán por consecuente una
+representación vectorial similar.
+
+Un *word embedding* es una matriz de parámetros entrenables donde a cada palabra
+del vocabulario se le asigna un vector representante. En esta sección, se
+procedió a obtener esta matriz con 2 métodos distintos:
+
+ - Entrenando los parámetros por medio de los datos disponibles (*Custom*).
+ - Utilizando representaciones disponibles en la web (*Pretrained*).
 """
 # %% [markdown]
 """
-### Custom
+### *Custom*
+
+Para instanciar un *embedding* de las palabras del conjunto de datos, se
+necesitó obtener la longitud del título más largo, el tamaño del vocabulario, y
+la dimensión de los vectores representación.
 """
 # %%
-# %%
-nof_out_of_vocab_rep = 1
-vocab_size = len(word_tokenizer.word_index) + nof_out_of_vocab_rep
-_, length_long_sentence = encoded_titles.shape
+_, long_sentence_size = encoded_titles.shape
+nof_dim_out_of_vocab = 1
+vocab_size = len(word_tokenizer.word_index) + nof_dim_out_of_vocab
 output_dim = 64
-embedding = Embedding(vocab_size, output_dim, input_length=length_long_sentence)
 # %% [markdown]
 """
-### Pretrained
+Cabe recordar que el tamaño del vocabulario es la cantidad de palabras distintas
+que ocurren en los títulos de las publicaciones más el número de dimensiones
+para representar las palabras fuera del vocabulario.
+"""
+# %%
+embedding_layer = embeddings.Embedding(vocab_size,
+                                       output_dim,
+                                       input_length=long_sentence_size)
+embedding_layer(tf.constant([1, 2]))
+# %% [markdown]
+"""
+Una vez instanciado el *embedding* se puede evaluarlo en índices que representan
+algúna palabra obteniendo la representación resultante. Por ejemplo, para los
+números 1 y 2 se obtuvieron los vectores dados por la celda anterior.
+"""
+# %%
+weights = embedding_layer.get_weights()[0]
+vocab = word_tokenizer.word_index.keys()
+# %% [markdown]
+"""
+Cabe recalcar nuevamente que los parámetros del *embedding* instanciado fueron
+asignados de manera aleatoria. En esta notebook, no se trabajará sobre la parte
+de entrenamiento de los *word embeddings* sino más bien, en lo que es necesario
+para su instanciación y escritura en disco. De todas formas, observar que se
+pueden acceder a los pesos y al vocabulario de un embedding aún si estos no se
+realizó este paso.
+"""
+# %%
+save_embedding(vocab, weights)
+# %% [markdown]
+"""
+Se utilizó la función `save_embedding` para almacenar en 2 archivos separados de
+manera estructurada para cada palabra en `vocab` su representación vectorial.
+Una vez descargados, estos pueden visualizarse por medio de la herramienta
+[Embedding Projector](http://projector.tensorflow.org/). Para ello.
+
+ - Seleccionar *Load data*.
+ - Agregar los 2 archivos creados por la celda anterior `metadata.tsv` y
+   `vectors.tsv`.
+"""
+# %% [markdown]
+"""
+### *Pretrained*
 """
 # %%
