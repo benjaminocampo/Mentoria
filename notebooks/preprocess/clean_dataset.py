@@ -92,10 +92,10 @@ catalogar dichas publicaciones. De manera similar ocurre con caracteres
 especiales, números, e incluso artículos o proposiciones. Por ende, se procedió
 a realizar un preprocesamiento de cada uno de los títulos donde se reemplazan:
 
-    - Caracteres que no tienen una codificación ascii.
-    - Números y símbolos.
-    - Contracciones de palabras por su expresión completa.
-    - *Stopwords*
+ - Caracteres que no tienen una codificación ascii.
+ - Números y símbolos.
+ - Contracciones de palabras por su expresión completa.
+ - *Stopwords*
 
 Esto es realizado por la función `clean_text` siendo aplicada para cada uno de
 los títulos del conjunto de datos.
@@ -130,11 +130,11 @@ word_tokenizer.word_counts
 word_tokenizer.word_index
 # %% [markdown]
 """
-En este caso, `word_tokenizer.word_index` muestra el vocabulario obtenido, donde
-a cada palabra se le hes asignado un único índice en base a su frecuencia dada
-por `word_tokenizer.word_counts`. Por ejemplo, el *token* `maquina` tiene mayor
-frecuencia que todas las palabras en el vocabulario y por ende se le asigna el
-índice 1, luego les siguen `x` con el índice 2, y así sucesivamente.
+En este caso, el atributo `word_index` muestra el vocabulario obtenido, donde a
+cada palabra se le hes asignado un único índice en base a su frecuencia dada por
+`word_counts`. Por ejemplo, el *token* `maquina` tiene mayor frecuencia que
+todas las palabras en el vocabulario y por ende se le asigna el índice 1, luego
+les siguen `x` con el índice 2, y así sucesivamente.
 """
 # %%
 encoded_titles = word_tokenizer.texts_to_sequences(df["cleaned_title"])
@@ -161,6 +161,11 @@ encoded_titles.shape
 # %% [markdown]
 """
 ## Codificación de etiquetas: *Label encoding*
+
+De igual manera que para los títulos, se necesitó codificar sus categorías
+asignadas. Sin embargo, no fue por medio de secuencias de números sino más bien
+a través de un índice por cada etiqueta, usando una instancia de la clase
+`LabelEncoder` de la librería `scikit-learn`.
 """
 # %%
 le = LabelEncoder()
@@ -168,6 +173,17 @@ encoded_labels = le.fit_transform(df["category"])
 encoded_labels
 # %%
 le.classes_
+# %% [markdown]
+"""
+`encoded_labels` corresponde a la misma columna de datos `category` del
+*dataframe* `df` con la diferencia de haber reemplazado cada etiqueta por un
+número entre 0 y el total de categorías. Luego, en caso de querer realizar el
+paso inverso de decodificación puede optar por usar el método
+`inverse_transorme` del códificador `le`. Por ejemplo, la etiqueta cuyo índice
+es 15 corresponde con `SEWING_MACHINES`.
+"""
+# %%
+le.inverse_transform([15])
 # %% [markdown]
 """
 ## *Word Embeddings*
