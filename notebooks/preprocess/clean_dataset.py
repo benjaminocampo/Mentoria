@@ -105,7 +105,6 @@ los títulos del conjunto de datos.
 df["title"].sample(5)
 # %%
 df = df.assign(cleaned_title=df["title"].apply(clean_text))
-# %%
 df[["title", "cleaned_title"]]
 # %% [markdown]
 """
@@ -147,9 +146,16 @@ correspondiente a los índices de cada una de las palabras que lo componen por
 medio de `texts_to_sequences`. Por ejemplo, el título `galoneira semi
 industrial` se le asigna el vector `[576, 186, 40]`, ya que `galoneira`, `semi`,
 e `industrial` son las palabras 576, 186, y 40 más frecuente del vocabulario, es
-decir, `word_index[galoneira] = 576`, `word_index[semi] = 186`, y
-`word_index[industrial] = 40`.
-
+decir:
+"""
+# %%
+(
+    word_tokenizer.word_index["galoneira"],
+    word_tokenizer.word_index["semi"],
+    word_tokenizer.word_index["industrial"]
+)
+# %% [markdown]
+"""
 Ahora bien, los vectores obtenidos tienen largos distintos según la cantidad de
 palabras que un título presente. Dado que un modelo requiere datos de entrada de
 una dimensión concreta, se rellenó con 0’s los vectores de representación de las
