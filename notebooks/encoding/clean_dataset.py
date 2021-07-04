@@ -45,6 +45,7 @@ import io
 import tqdm
 import pandas as pd
 import tensorflow as tf
+import numpy as np
 
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Flatten, Embedding, Dot
@@ -356,7 +357,7 @@ palabras no son acordes a su significado.
 """
 # %% [markdown]
 """
-### Word2Vec
+### *Word2Vec*
 
 Para entrenar los parámetros presentens en `weights` se utilizó el modelo
 `word2vec` que consiste en generar *skip-grams* a través de una lista de
@@ -428,5 +429,53 @@ almacenar en 2 archivos separados de manera estructurada para cada palabra en
 # %% [markdown]
 """
 ### *Pretrained*
+
+Dado que en el conjunto de datos se encuentran títulos en español y portugués,
+se utilizaron [word embeddings preentrados con
+FastText](https://fasttext.cc/docs/en/pretrained-vectors.html) de estos idiomas.
+
+Para cargar el conjunto de datos se implementó la función `load_embedding` que
+requiere el vocabulario a utilizar, la dimensión de los *embeddings* descargados
+y la ruta del archivo local al ordenador en el que se está ejecutando esta
+notebook.
 """
 # %%
+def load_embedding(filename, vocab, embedding_dim):
+
+    vocab_size = len(vocab) + 1
+    nof_hits = 0
+    nof_misses = 0
+
+    embedding_indexes = {}
+    with open(filename) as f:
+        _, _ = map(int, f.readline().split())
+        for line in f:
+            word, coef = line.rstrip().split(' ')
+            embedding_indexes[word] = map(float, coef)
+
+    embedding_matrix = np.zeros((vocab_size, embedding_dim))
+    for word in vocab:
+        vector = embedding_indexes.get(word)
+        if vector is not None:
+            embedding_matrix[word] = vector
+            nof_hits += 1
+        else:
+            nof_misses += 1
+
+    embedding_layer = Embedding(
+        vocab_size,
+        embedding_dim,
+        embeddings_initializer=tf.keras.initializers.Constant(
+            embedding_matrix),
+        trainable=False,
+    )
+
+    return embedding_layer, nof_hits, nof_misses
+
+
+filename = "filename"
+vocab = word_tokenizer.word_index.keys()
+embedding_dim = 300
+embedding_layer, nof_hits, nof_misses = load_embedding(filename, vocab, embedding_dim)
+# %%
+embedding_layer.get_weights()
