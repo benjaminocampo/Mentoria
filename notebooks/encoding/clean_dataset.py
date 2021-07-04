@@ -304,7 +304,7 @@ le.inverse_transform([15])
 
 En la sección anterior se representaron los títulos de las publicaciones por
 medio de vectores densos, donde una palabra era representada por el índice $i$,
-si esta era la $i-ésima$ palabra más frecuente. No obstante, también se pueden
+si esta era la $i$-ésima palabra más frecuente. No obstante, también se pueden
 representar las palabras por medio de vectores que mantengan su semántica, es
 decir, aquellas que tengan un significado similar, tendrán por consecuente una
 representación vectorial similar.
@@ -343,7 +343,7 @@ embedding_layer(tf.constant([1, 2]))
 # %% [markdown]
 """
 Una vez instanciado el *embedding* se puede evaluarlo en índices que representan
-algúna palabra obteniendo la representación resultante. Por ejemplo, para los
+alguna palabra obteniendo la representación resultante. Por ejemplo, para los
 números 1 y 2 se obtuvieron los vectores dados por la celda anterior.
 """
 # %%
@@ -359,7 +359,7 @@ palabras no son acordes a su significado.
 """
 ### *Word2Vec*
 
-Para entrenar los parámetros presentens en `weights` se utilizó el modelo
+Para entrenar los parámetros presentes en `weights` se utilizó el modelo
 `word2vec` que consiste en generar *skip-grams* a través de una lista de
 oraciones. Estos *skip-grams* son pares `(target, context)` donde dada una
 palabra `target`, se le asocia otra denominada `context` que puede o no
@@ -397,7 +397,7 @@ parámetros tras haber evaluado un lote o *batch* y agilizar el entrenamiento.
 
 Debido al tamaño del conjunto de datos resultante, el entrenamiento puede llevar
 algunos minutos. Por ello, se dispuso la matriz de pesos obtenida bajo la
-semilla `seed` utilizada en un servidor para facilitar su acceso remóto.
+semilla `seed` utilizada en un servidor para facilitar su acceso remoto.
 También, pueden ser visualizados por la herramienta [Embedding
 Projector](http://projector.tensorflow.org/). Para ello.
 
@@ -408,7 +408,7 @@ Projector](http://projector.tensorflow.org/). Para ello.
    [vectors.tsv](https://drive.google.com/file/d/1XW5ndaAocWhUFXZPoSEGLuxGjYbmLydW/view?usp=sharing).
 
 En caso de no querer realizar el entrenamiento, se puede proceder a la siguiente
-sección donde se utilizó el embedding preentrenado y otros disponibles online.
+sección donde se utilizó el embedding pre-entrenado y otros disponibles online.
 """
 # %%
 embedding_dim = 128
@@ -434,7 +434,7 @@ almacenar en 2 archivos separados de manera estructurada para cada palabra en
 ### *Pretrained*
 
 Dado que en el conjunto de datos se encuentran títulos en español y portugués,
-se utilizaron [word embeddings preentrados con
+se utilizaron [word embeddings pre-entrenados con
 FastText](https://fasttext.cc/docs/en/pretrained-vectors.html) de estos idiomas.
 
 Para cargar el conjunto de datos se implementó la función `load_embedding` que
@@ -499,7 +499,7 @@ de una única fuente.
 
 Otro de los aspectos que es importante mejorar es la disposición de los
 *scripts* de `Python` y la jerarquía de directorios. Separarlos en directorios
-`models` y `preprocess` separado del directorio `notebooks` pero que tengan un
+`models` y `preprocess` separado del directorio `notebooks`, pero que tengan un
 solo punto de acceso es otro de los trabajos a futuro.
 
 Por último, resultaría interesante obtener una comparación entre *word
