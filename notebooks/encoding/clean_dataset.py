@@ -33,38 +33,131 @@ resultante que pueda ser evaluada en modelos de clasificación.
 
 Al igual que en la exploración, se definen algunas funcionalidades que serán de
 utilidad durante la codificación, pero que no son muy relevantes para el
-seguimiento de este trabajo. No obstante, con el fin de mantener la
-reproducibilidad con herramientas *online* tales como `Google Colab`, son
-mantenidas en una sección dentro de esta notebook.
+seguimiento de este trabajo. Con el fin de mantener la reproducibilidad con
+herramientas *online* tales como `Google Colab`, son mantenidas en una sección
+dentro de esta notebook. No obstante, en futuros trabajos se procederá a
+estructurar dichas funcionalidades en scripts separados manteniendo un único
+*entrypoint*.
 """
 # %%
-from numpy.lib.npyio import save
-import pandas as pd
-import tensorflow as tf
 import re
 import io
-# keras libraries
-from keras import Sequential
-from keras.layers import Dense, Flatten, embeddings
-from keras.preprocessing import text, sequence
-# preprocessing libraries
-from nltk import (download, corpus, tokenize)
+import tqdm
+import pandas as pd
+import tensorflow as tf
+
+from tensorflow.keras import Model
+from tensorflow.keras.layers import Flatten, Embedding, Dot
+from tensorflow.keras.preprocessing import text, sequence
+
 from sklearn.preprocessing import LabelEncoder
 from unidecode import unidecode
 
+from nltk import (download, corpus, tokenize)
 download("stopwords")
 download('punkt')
 
 stopwords = (set(corpus.stopwords.words("spanish")) |
              set(corpus.stopwords.words("portuguese")))
+# %%
+class Word2Vec(Model):
+    def __init__(self, vocab_size, embedding_dim, num_ns):
+        super(Word2Vec, self).__init__()
+        self.target_embedding = Embedding(vocab_size,
+                                          embedding_dim,
+                                          input_length=1,
+                                          name="w2v_embedding")
+        self.context_embedding = Embedding(vocab_size,
+                                           embedding_dim,
+                                           input_length=num_ns + 1)
+        self.dots = Dot(axes=(3, 2))
+        self.flatten = Flatten()
 
-URL = "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"
-df = pd.read_csv(URL)
+    def call(self, pair):
+        target, context = pair
+        word_emb = self.target_embedding(target)
+        context_emb = self.context_embedding(context)
+        dots = self.dots([context_emb, word_emb])
+        return self.flatten(dots)
+
+
+def generate_skipgram_training_data(sequences, window_size, num_ns, vocab_size,
+                                    batch_size, buffer_size, seed):
+    """
+    Generates skip-gram pairs with negative sampling for a list of sequences
+    (int-encoded sentences) based on window size, number of negative samples
+    and vocabulary size.
+    """
+    # Elements of each training example are appended to these lists.
+    targets, contexts, labels = [], [], []
+
+    # Build the sampling table for vocab_size tokens.
+    sampling_table = tf.keras.preprocessing.sequence.make_sampling_table(
+        vocab_size)
+
+    # Iterate over all sequences (sentences) in dataset.
+    for sequence in tqdm.tqdm(sequences):
+
+        # Generate positive skip-gram pairs for a sequence (sentence).
+        positive_skip_grams, _ = tf.keras.preprocessing.sequence.skipgrams(
+            sequence,
+            vocabulary_size=vocab_size,
+            sampling_table=sampling_table,
+            window_size=window_size,
+            negative_samples=0)
+
+        # Iterate over each positive skip-gram pair to produce training examples
+        # with positive context word and negative samples.
+        for target_word, context_word in positive_skip_grams:
+            context_class = tf.expand_dims(
+                tf.constant([context_word], dtype="int64"), 1)
+            negative_sampling_candidates, _, _ = tf.random.log_uniform_candidate_sampler(
+                true_classes=context_class,
+                num_true=1,
+                num_sampled=num_ns,
+                unique=True,
+                range_max=vocab_size,
+                seed=seed,
+                name="negative_sampling")
+
+            # Build context and label vectors (for one target word)
+            negative_sampling_candidates = tf.expand_dims(
+                negative_sampling_candidates, 1)
+
+            context = tf.concat([context_class, negative_sampling_candidates],
+                                0)
+            label = tf.constant([1] + [0] * num_ns, dtype="int64")
+
+            # Append each element from the training example to global lists.
+            targets.append(target_word)
+            contexts.append(context)
+            labels.append(label)
+
+    dataset = tf.data.Dataset.from_tensor_slices(((targets, contexts), labels))
+    dataset = dataset.shuffle(buffer_size).batch(batch_size,
+                                                 drop_remainder=True)
+    dataset = dataset.cache().prefetch(buffer_size=tf.data.AUTOTUNE)
+
+    return dataset
+
+
+def save_embedding(vocab, weights):
+    out_vectors = io.open('vectors.tsv', 'w', encoding='utf-8')
+    out_metadata = io.open('metadata.tsv', 'w', encoding='utf-8')
+
+    for index, word in enumerate(vocab):
+        if index != 0:
+            vec = weights[index]
+            out_vectors.write('\t'.join([str(x) for x in vec]) + "\n")
+            out_metadata.write(word + "\n")
+    out_vectors.close()
+    out_metadata.close()
 
 
 def clean_text(s: str) -> str:
     """
     Given a string @s the following parsing is performed:
+        - Lowercase letters.
         - Removes non-ascii characters.
         - Removes numbers and special symbols.
         - Expand common contractions.
@@ -88,18 +181,9 @@ def clean_text(s: str) -> str:
     s = ' '.join(w for w in tokenize.word_tokenize(s) if not w in stopwords)
     return s
 
-
-def save_embedding(vocab, weights):
-    out_vectors = io.open('vectors.tsv', 'w', encoding='utf-8')
-    out_metadata = io.open('metadata.tsv', 'w', encoding='utf-8')
-
-    for index, word in enumerate(vocab):
-        if index != 0:
-            vec = weights[index]
-            out_vectors.write('\t'.join([str(x) for x in vec]) + "\n")
-            out_metadata.write(word + "\n")
-    out_vectors.close()
-    out_metadata.close()
+# %%
+URL = "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"
+df = pd.read_csv(URL)
 # %% [markdown]
 """
 ## Limpieza de Texto
@@ -251,9 +335,9 @@ que ocurren en los títulos de las publicaciones más el número de dimensiones
 para representar las palabras fuera del vocabulario.
 """
 # %%
-embedding_layer = embeddings.Embedding(vocab_size,
-                                       output_dim,
-                                       input_length=long_sentence_size)
+embedding_layer = Embedding(vocab_size,
+                            output_dim,
+                            input_length=long_sentence_size)
 embedding_layer(tf.constant([1, 2]))
 # %% [markdown]
 """
@@ -267,24 +351,79 @@ vocab = word_tokenizer.word_index.keys()
 # %% [markdown]
 """
 Cabe recalcar nuevamente que los parámetros del *embedding* instanciado fueron
-asignados de manera aleatoria. En esta notebook, no se trabajará sobre la parte
-de entrenamiento de los *word embeddings* sino más bien, en lo que es necesario
-para su instanciación y escritura en disco. De todas formas, observar que se
-pueden acceder a los pesos y al vocabulario de un embedding aún si estos no se
-realizó este paso.
+asignados de manera aleatoria y por lo tanto las representaciones de las
+palabras no son acordes a su significado.
 """
+# %% [markdown]
+"""
+### Word2Vec
+
+Para entrenar los parámetros presentens en `weights` se utilizó el modelo
+`word2vec` que consiste en generar *skip-grams* a través de una lista de
+oraciones. Estos *skip-grams* son pares `(target, context)` donde dada una
+palabra `target`, se le asocia otra denominada `context` que puede o no
+encontrarse en su contexto. Si ocurre lo primero, se tiene un *skip-gram*
+positivo, y en caso contrario uno negativo. El objetivo fue generar para cada
+palabra en el vocabulario, un *skip-gram* positivo y una cantidad
+`nof_negative_skipgrams` negativos, y utilizarlos para entrenar un *embedding*
+personalizado. Varios aspectos de implementación fueron obtenidos desde las
+siguientes fuentes:
+
+ - [Artículo ilustrativo de
+   word2vec](https://jalammar.github.io/illustrated-word2vec/)
+ - [Tutorial de tensorflow y
+   keras](https://www.tensorflow.org/tutorials/text/word2vec#generate_skip-grams_from_one_sentence)
+"""
+# %%
+seed = 42
+nof_negative_skipgrams = 4
+batch_size = 1024
+buffer_size = 10000
+dataset = generate_skipgram_training_data(
+    sequences=encoded_titles,
+    window_size=2,
+    num_ns=4,
+    vocab_size=vocab_size,
+    seed=seed,
+    batch_size=batch_size,
+    buffer_size=buffer_size)
+# %% [markdown]
+"""
+Para la generación del conjunto de datos se utilizó la función
+`generate_skipgram_training_data` con una cantidad de 4 *skip-grams* negativos
+por 1 positivo y organizado en *mini-batches* para únicamente actualizar los
+parámetros tras haber evaluado un lote o *batch* y agilizar el entrenamiento.
+
+Debido al tamaño del conjunto de datos resultante, el entrenamiento puede llevar
+algunos minutos. Por ello, se dispuso la matriz de pesos obtenida bajo la
+semilla `seed` utilizada en un servidor para facilitar su acceso remóto.
+También, pueden ser visualizados por la herramienta [Embedding
+Projector](http://projector.tensorflow.org/). Para ello.
+
+ - Seleccionar *Load data*.
+ - Agregar los archivos [metadata.tsv]() y [vectors.tsv]().
+
+En caso de no querer realizar el entrenamiento, se puede proceder a la siguiente
+sección donde se utilizó el embedding preentrenado y otros disponibles online.
+"""
+# %%
+embedding_dim = 128
+word2vec = Word2Vec(vocab_size, embedding_dim, nof_negative_skipgrams)
+word2vec.compile(optimizer='adam',
+                 loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
+                 metrics=['accuracy'])
+tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="logs")
+word2vec.fit(dataset, epochs=20, callbacks=[tensorboard_callback])
+# %%
+weights = word2vec.get_layer('w2v_embedding').get_weights()[0]
+vocab = word_tokenizer.word_index.keys()
 # %%
 save_embedding(vocab, weights)
 # %% [markdown]
 """
-Se utilizó la función `save_embedding` para almacenar en 2 archivos separados de
-manera estructurada para cada palabra en `vocab` su representación vectorial.
-Una vez descargados, estos pueden visualizarse por medio de la herramienta
-[Embedding Projector](http://projector.tensorflow.org/). Para ello.
-
- - Seleccionar *Load data*.
- - Agregar los 2 archivos creados por la celda anterior `metadata.tsv` y
-   `vectors.tsv`.
+Luego de la etapa de entrenamiento. Se utilizó la función `save_embedding` para
+almacenar en 2 archivos separados de manera estructurada para cada palabra en
+`vocab` su representación vectorial.
 """
 # %% [markdown]
 """
