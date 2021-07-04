@@ -402,7 +402,10 @@ También, pueden ser visualizados por la herramienta [Embedding
 Projector](http://projector.tensorflow.org/). Para ello.
 
  - Seleccionar *Load data*.
- - Agregar los archivos [metadata.tsv]() y [vectors.tsv]().
+ - Agregar los archivos
+   [metadata.tsv](https://drive.google.com/file/d/1QkmlfADvogUfWcH2iPG7oZnjivu6_Hdd/view?usp=sharing)
+   y
+   [vectors.tsv](https://drive.google.com/file/d/1XW5ndaAocWhUFXZPoSEGLuxGjYbmLydW/view?usp=sharing).
 
 En caso de no querer realizar el entrenamiento, se puede proceder a la siguiente
 sección donde se utilizó el embedding preentrenado y otros disponibles online.
@@ -479,3 +482,28 @@ embedding_dim = 300
 embedding_layer, nof_hits, nof_misses = load_embedding(filename, vocab, embedding_dim)
 # %%
 embedding_layer.get_weights()
+# %% [markdown]
+"""
+## Conclusión
+
+La elección de un adecuado preprocesamiento y codificación pueden ser relevantes
+durante la ejecución de un modelo. Debido a ello, se planteó una posible
+representación pero sin dejar de lado otras posibilidades. En particular,
+limpieza de texto sin eliminar *stopwords*, entrenamiento de *word embeddings*
+utilizando *FastText*, o codificación de títulos por *one-hot encoding*. A su
+vez, dado que se tienen títulos de dos idiomas distintos en el conjunto de
+datos, si se utilizan *word embeddings* disponibles online, deben traerse de
+estas dos fuentes y combinarse para formar una única matriz de vectores densos.
+En este caso, la implementación actual solo permite extraer un *word embedding*
+de una única fuente.
+
+Otro de los aspectos que es importante mejorar es la disposición de los
+*scripts* de `Python` y la jerarquía de directorios. Separarlos en directorios
+`models` y `preprocess` separado del directorio `notebooks` pero que tengan un
+solo punto de acceso es otro de los trabajos a futuro.
+
+Por último, resultaría interesante obtener una comparación entre *word
+embeddings* ya pre-entrenados junto a otros personalizados de acuerdo al
+conjunto de datos de Mercado Libre y si se observa alguna diferencia en los
+modelos de categorización.
+"""
