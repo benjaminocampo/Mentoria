@@ -55,12 +55,13 @@ from sklearn.preprocessing import LabelEncoder
 from unidecode import unidecode
 
 from nltk import (download, corpus, tokenize)
+from typing import List
 
 download("stopwords")
 download('punkt')
 # %%
 class Word2Vec(Model):
-    def __init__(self, vocab_size, embedding_dim, num_ns):
+    def __init__(self, vocab_size: int, embedding_dim: int, num_ns: int):
         super(Word2Vec, self).__init__()
         self.target_embedding = Embedding(vocab_size,
                                           embedding_dim,
@@ -140,7 +141,11 @@ def generate_skipgram_training_data(sequences, window_size, num_ns, vocab_size,
     return dataset
 
 
-def save_embedding(vocab, weights):
+def save_embedding(vocab: List[str], weights: np.array):
+    """
+    Given a list of words and a its corresponding weights, it saves them in
+    files metadata.tsv and vectors.tsv respectively.
+    """
     out_vectors = io.open('vectors.tsv', 'w', encoding='utf-8')
     out_metadata = io.open('metadata.tsv', 'w', encoding='utf-8')
 
@@ -153,7 +158,7 @@ def save_embedding(vocab, weights):
     out_metadata.close()
 
 
-def clean_text(s: str, language) -> str:
+def clean_text(s: str, language: str) -> str:
     """
     Given a string @s and its @language the following parsing is performed:
         - Lowercase letters.
@@ -182,8 +187,12 @@ def clean_text(s: str, language) -> str:
     return s
 
 
-def load_embedding(filename, vocab, embedding_dim):
-
+def load_embedding(filename: str, vocab: List[str], embedding_dim: int):
+    """
+    Given a path in your local system of an embedding file where each line has
+    the embedded vector of dimension @embedding_dim separated by spaces, returns
+    an embedding that contains only the words in @vocab.
+    """
     vocab_size = len(vocab) + 1
     nof_hits = 0
     nof_misses = 0
