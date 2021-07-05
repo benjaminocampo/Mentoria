@@ -55,11 +55,9 @@ from sklearn.preprocessing import LabelEncoder
 from unidecode import unidecode
 
 from nltk import (download, corpus, tokenize)
+
 download("stopwords")
 download('punkt')
-
-stopwords = (set(corpus.stopwords.words("spanish")) |
-             set(corpus.stopwords.words("portuguese")))
 # %%
 class Word2Vec(Model):
     def __init__(self, vocab_size, embedding_dim, num_ns):
@@ -155,9 +153,9 @@ def save_embedding(vocab, weights):
     out_metadata.close()
 
 
-def clean_text(s: str) -> str:
+def clean_text(s: str, language) -> str:
     """
-    Given a string @s the following parsing is performed:
+    Given a string @s and its @language the following parsing is performed:
         - Lowercase letters.
         - Removes non-ascii characters.
         - Removes numbers and special symbols.
@@ -179,8 +177,42 @@ def clean_text(s: str) -> str:
         s = s.replace(expression, replacement)
     s = re.sub(numbers, "", s)
     s = re.sub(symbols, "", s)
-    s = ' '.join(w for w in tokenize.word_tokenize(s) if not w in stopwords)
+    s = ' '.join(w for w in tokenize.word_tokenize(s)
+                 if not w in corpus.stopwords.words(language))
     return s
+
+
+def load_embedding(filename, vocab, embedding_dim):
+
+    vocab_size = len(vocab) + 1
+    nof_hits = 0
+    nof_misses = 0
+
+    embedding_indexes = {}
+    with open(filename) as f:
+        _, _ = map(int, f.readline().split())
+        for line in f:
+            word, *coef = line.rstrip().split(' ')
+            embedding_indexes[word] = np.asarray(coef, dtype=float)
+
+    embedding_matrix = np.zeros((vocab_size, embedding_dim))
+    for index, word in enumerate(vocab):
+        vector = embedding_indexes.get(word)
+        if vector is not None:
+            embedding_matrix[index] = vector
+            nof_hits += 1
+        else:
+            nof_misses += 1
+
+    embedding_layer = Embedding(
+        vocab_size,
+        embedding_dim,
+        embeddings_initializer=tf.keras.initializers.Constant(
+            embedding_matrix),
+        trainable=False,
+    )
+
+    return embedding_layer, nof_hits, nof_misses
 
 # %%
 URL = "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"
@@ -201,15 +233,16 @@ a realizar un preprocesamiento de cada uno de los títulos donde se reemplazan:
  - Caracteres que no tienen una codificación ascii.
  - Números y símbolos.
  - Contracciones de palabras por su expresión completa.
- - *Stopwords*
+ - *Stopwords* de acuerdo al lenguage.
 
 Esto es realizado por la función `clean_text` siendo aplicada para cada uno de
-los títulos del conjunto de datos.
+los títulos del conjunto de datos (Puede demorar algunos minutos).
 """
 # %%
 df["title"].sample(5)
 # %%
-df = df.assign(cleaned_title=df["title"].apply(clean_text))
+df = df.assign(cleaned_title=df[["title", "language"]].apply(
+    lambda x: clean_text(*x), axis=1))
 df[["title", "cleaned_title"]]
 # %% [markdown]
 """
@@ -249,8 +282,8 @@ encoded_titles[:5]
 Basándose en esto, se codificaron los títulos asignándole un vector
 correspondiente a los índices de cada una de las palabras que lo componen por
 medio de `texts_to_sequences`. Por ejemplo, el título `galoneira semi
-industrial` se le asigna el vector `[576, 186, 40]`, ya que `galoneira`, `semi`,
-e `industrial` son las palabras 576, 186, y 40 más frecuente del vocabulario, es
+industrial` se le asigna el vector `[580, 188, 40]`, ya que `galoneira`, `semi`,
+e `industrial` son las palabras 580, 188, y 40 más frecuentes del vocabulario, es
 decir, dichos números son los índices asignados a cada una de esas palabras como
 puede a través de la siguiente celda.
 """
@@ -440,48 +473,16 @@ FastText](https://fasttext.cc/docs/en/pretrained-vectors.html) de estos idiomas.
 Para cargar el conjunto de datos se implementó la función `load_embedding` que
 requiere el vocabulario a utilizar, la dimensión de los *embeddings* descargados
 y la ruta del archivo local al ordenador en el que se está ejecutando esta
-notebook.
+notebook. Por ejemplo, para cargar las representaciones de palabras en portugués
+dado por el archivo `wiki.pt.vec` ubicado al mismo nivel de esta notebook
 """
 # %%
-def load_embedding(filename, vocab, embedding_dim):
-
-    vocab_size = len(vocab) + 1
-    nof_hits = 0
-    nof_misses = 0
-
-    embedding_indexes = {}
-    with open(filename) as f:
-        _, _ = map(int, f.readline().split())
-        for line in f:
-            word, coef = line.rstrip().split(' ')
-            embedding_indexes[word] = map(float, coef)
-
-    embedding_matrix = np.zeros((vocab_size, embedding_dim))
-    for word in vocab:
-        vector = embedding_indexes.get(word)
-        if vector is not None:
-            embedding_matrix[word] = vector
-            nof_hits += 1
-        else:
-            nof_misses += 1
-
-    embedding_layer = Embedding(
-        vocab_size,
-        embedding_dim,
-        embeddings_initializer=tf.keras.initializers.Constant(
-            embedding_matrix),
-        trainable=False,
-    )
-
-    return embedding_layer, nof_hits, nof_misses
-
-
-filename = "filename"
+filename = "wiki.pt.vec"
 vocab = word_tokenizer.word_index.keys()
 embedding_dim = 300
 embedding_layer, nof_hits, nof_misses = load_embedding(filename, vocab, embedding_dim)
 # %%
-embedding_layer.get_weights()
+embedding_layer.embeddings_initializer.value
 # %% [markdown]
 """
 ## Conclusión
