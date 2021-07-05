@@ -61,6 +61,10 @@ download("stopwords")
 download('punkt')
 # %%
 class Word2Vec(Model):
+    """
+    word2vec class that implements @call method that will be called during
+    training.
+    """
     def __init__(self, vocab_size: int, embedding_dim: int, num_ns: int):
         super(Word2Vec, self).__init__()
         self.target_embedding = Embedding(vocab_size,
@@ -81,8 +85,10 @@ class Word2Vec(Model):
         return self.flatten(dots)
 
 
-def generate_skipgram_training_data(sequences, window_size, num_ns, vocab_size,
-                                    batch_size, buffer_size, seed):
+def generate_skipgram_training_data(sequences: np.array, window_size: int,
+                                    num_ns: int, vocab_size: int,
+                                    batch_size: int, buffer_size: int,
+                                    seed: int) -> tf.Tensor:
     """
     Generates skip-gram pairs with negative sampling for a list of sequences
     (int-encoded sentences) based on window size, number of negative samples
@@ -141,7 +147,7 @@ def generate_skipgram_training_data(sequences, window_size, num_ns, vocab_size,
     return dataset
 
 
-def save_embedding(vocab: List[str], weights: np.array):
+def save_embedding(vocab: List[str], weights: np.array) -> None:
     """
     Given a list of words and a its corresponding weights, it saves them in
     files metadata.tsv and vectors.tsv respectively.
@@ -187,7 +193,8 @@ def clean_text(s: str, language: str) -> str:
     return s
 
 
-def load_embedding(filename: str, vocab: List[str], embedding_dim: int):
+def load_embedding(filename: str, vocab: List[str],
+                   embedding_dim: int) -> Embedding:
     """
     Given a path in your local system of an embedding file where each line has
     the embedded vector of dimension @embedding_dim separated by spaces, returns
