@@ -9,10 +9,9 @@ from mlflow.tracking import MlflowClient
 # Sklearn
 from sklearn.model_selection import train_test_split, StratifiedKFold
 # Utilities
-from models import load_embedding, create_embedding_layer, create_baseline_model
+from models import load_embedding, create_embedding_layer, baseline_model
 from preprocess import clean_text
 from encoding import encode_labels, tokenize_features
-from graphs import plot_accuracy_curve
 from parser import get_parser
 
 
@@ -27,6 +26,7 @@ class Pipeline:
         self.x_test = None
         self.y_train = None
         self.y_test = None
+
         self.model = None
         self.embeddings = None
         self.vocab = None
@@ -85,19 +85,23 @@ class Pipeline:
         # Choose model
         # TODO: Here we should choose over a variaty of models. They could also
         # be implemented using classes
-        self.model = create_baseline_model(embedding_layer=embedding_layer,
-                                           nof_classes=len(
-                                               np.unique(self.y_train)))
+        self.model = baseline_model(embedding_layer=embedding_layer,
+                                    nof_classes=len(np.unique(self.y_train)))
 
     def k_fold_cross_validation(self):
-        # Get epochs, number of folds and batch size
+        # Log parameters
+        mlflow.log_param("seed", self.params.seed)
+        mlflow.log_param("kfolds", self.params.kfolds)
+        mlflow.log_param("epochs", self.params.epochs)
+        mlflow.log_param("batch size", self.params.batch_size)
 
-        batch_size = self.params.batch_size
-
+        initial_weigths = self.model.get_weights()
+        val_accuracy = []
+        val_loss = []
         # Split on training to get cross-validation sets
         skf = StratifiedKFold(n_splits=self.params.kfolds, shuffle=False)
-        for train_indices, val_indices in skf.split(self.x_train,
-                                                    self.y_train):
+        for fold_id, (train_indices, val_indices) in enumerate(
+                skf.split(self.x_train, self.y_train)):
             # Fit the model and get the history of improvement
             history = self.model.fit(self.x_train[train_indices],
                                      self.y_train[train_indices],
@@ -110,29 +114,45 @@ class Pipeline:
                 self.y_train[val_indices],
                 batch_size=self.params.batch_size,
                 verbose=1)
-            # Get accuracy plot
-            fig = plot_accuracy_curve(history.history["accuracy"])
 
-            # Save accuracy curve
-            fig.savefig(
-                f"{self.params.img_path}/{self.params.experiment_name}.png")
+            val_accuracy.append(accuracy)
+            val_loss.append(loss)
 
-            # Track images, params, and metrics
-            mlflow.log_artifact(
-                f"{self.params.img_path}/{self.params.experiment_name}.png")
+            for epoch in range(self.params.epochs):
+                mlflow.log_metric(f"fold {fold_id} accuracy curve",
+                                  history.history["accuracy"][epoch],
+                                  step=epoch)
+                mlflow.log_metric(f"fold {fold_id} loss curve",
+                                  history.history["loss"][epoch],
+                                  step=epoch)
 
-            mlflow.log_param("seed", self.params.seed)
-            mlflow.log_param("kfolds", self.params.kfolds)
-            mlflow.log_param("epochs", self.params.epochs)
-            mlflow.log_param("batch size", batch_size)
-            mlflow.log_metric("accuracy", accuracy)
-            mlflow.log_metric("loss", loss)
+
+            # Predecir los y's usando self.model, pasandoles x_train 
+
+            # Reset model for next iteration
+            self.model.set_weights(initial_weigths)
+        mlflow.log_metric("mean val accuracy", np.mean(val_accuracy))
+        mlflow.log_metric("mean val loss", np.mean(val_loss))
 
     def evaluate_model(self):
+        # Train model again but this time using all training data
+        history = self.model.fit(self.x_train,
+                                 self.y_train,
+                                 batch_size=self.params.batch_size,
+                                 epochs=self.params.epochs,
+                                 verbose=1)
         loss, accuracy = self.model.evaluate(self.x_test,
                                              self.y_test,
-                                             batch_size=128,
-                                             verbose=0)
+                                             batch_size=self.params.batch_size,
+                                             verbose=1)
+
+        for epoch in range(self.params.epochs):
+            mlflow.log_metric(f"test accuracy curve",
+                              history.history["accuracy"][epoch],
+                              step=epoch)
+            mlflow.log_metric(f"test loss curve",
+                              history.history["loss"][epoch],
+                              step=epoch)
 
         mlflow.log_metric("test accuracy", accuracy)
         mlflow.log_metric("test loss", loss)

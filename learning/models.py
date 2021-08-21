@@ -1,6 +1,7 @@
 import numpy as np
 from keras.models import Sequential
 from keras.layers import Embedding, Dense, Flatten
+from keras.optimizers import Adam
 from typing import List
 from tqdm import tqdm
 import pdb
@@ -45,13 +46,20 @@ def create_embedding_layer(vocab_size, embedding_dim, embedding_matrix):
     )
 
 
-def create_baseline_model(embedding_layer, nof_classes):
+def baseline_model(embedding_layer, nof_classes):
     baseline = Sequential()
+
+    # Add embedding layer
     baseline.add(embedding_layer)
-    baseline.add(Dense(128, activation='relu'))
-    baseline.add(Dense(nof_classes, activation='softmax'))
+
+    # Tune the number of units in the first Dense layer
+    # hp_units = hp.Int("units", min_value=32, max_value=512, step=32)
+    baseline.add(Dense(units=128, activation="relu"))
+    baseline.add(Dense(nof_classes, activation="softmax"))
     baseline.add(Flatten())
-    baseline.compile(loss='sparse_categorical_crossentropy',
-                     optimizer='adam',
-                     metrics=['accuracy'])
+
+    #hp_learning_rate = hp.Choice("learning_rate", values=[1e-2, 1e-3, 1e-4])
+    baseline.compile(loss="sparse_categorical_crossentropy",
+                     optimizer=Adam(),
+                     metrics=["accuracy"])
     return baseline
