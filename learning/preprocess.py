@@ -1,4 +1,3 @@
-from os import remove
 import re
 from nltk import (corpus, tokenize, download)
 from unidecode import unidecode

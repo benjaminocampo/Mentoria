@@ -1,11 +1,12 @@
 import argparse
 
+
 def get_parser():
     parser = argparse.ArgumentParser(description="Process model arguments")
     parser.add_argument("--experiment_name",
                         help="name used by mlflow to record your experiments",
                         required=True)
-    parser.add_argument("--k-folds",
+    parser.add_argument("--kfolds",
                         help="number of folds used in cross-validation",
                         type=int,
                         default=5)
@@ -20,11 +21,24 @@ def get_parser():
     parser.add_argument("--embedding_dim",
                         help="dimension used in word embeddings",
                         type=int,
-                        default=50)
+                        default=300)
     parser.add_argument("--embedding_file",
                         help="filename of pre-trained word embeddings",
                         type=str,
                         default="wiki.pt.vec")
+    parser.add_argument(
+        "--test_size",
+        help="test size percentage used in stratified sampling splitting",
+        type=float,
+        default=.2)
+    parser.add_argument("--epochs",
+                        help="Number of epochs used when validating",
+                        type=float,
+                        default=5)
+    parser.add_argument(
+        "--img_path",
+        help="url indicating where the output directory of images is located",
+        default="plots")
     parser.add_argument(
         "--dataset_path",
         help="url of where the database is located",

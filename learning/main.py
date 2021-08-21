@@ -1,6 +1,7 @@
 # Tqdm
 from tqdm import tqdm
-# Pandas
+# Data
+import numpy as np
 import pandas as pd
 # MLflow
 import mlflow
@@ -34,16 +35,16 @@ class Pipeline:
         # Read dataset
         self.dataset = pd.read_csv(self.dataset_path)
 
-    def preprocess_data(self):
-         # Activate progress bar in pandas
-        tqdm.pandas()
+        self.dataset = self.dataset.sample(5000, random_state=self.params.seed)
 
+    def preprocess_data(self):
         # Remove numbers, symbols, special chars, contractions, etc.
-        cleaned_title_col = self.dataset[["title", "language"]].progress_apply(
-            lambda x: clean_text(*x), axis=1)
+        cleaned_title_col = self.dataset[["title", "language"
+                                          ]].apply(lambda x: clean_text(*x),
+                                                   axis=1)
 
         # Add @cleaned_title column to dataset
-        self.dataset = self.dataset.apply(cleaned_title=cleaned_title_col)
+        self.dataset = self.dataset.assign(cleaned_title=cleaned_title_col)
 
         # Set titles and categories as features and labels
         self.x = self.dataset["cleaned_title"]
@@ -52,10 +53,13 @@ class Pipeline:
     def split_data(self):
         # Split dataset into training and testing instances
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
-            self.x, self.y, test_size=self.params.test_size)
+            self.x,
+            self.y,
+            test_size=self.params.test_size,
+            random_state=self.params.seed)
 
     def encode_data(self):
-        # Encode training and testing instances separately
+        # Encode training and testing titles separately
         self.x_train, self.x_test, self.vocab = tokenize_features(
             self.x_train, self.x_test)
 
@@ -63,8 +67,13 @@ class Pipeline:
         self.y_train, self.y_test = encode_labels(self.y_train, self.y_test)
 
         # Load pre-trained embeddings
-        self.embeddings = load_embedding(self.params.embedding_file, self.vocab,
-                                         self.params.embedding_dim)
+        self.embeddings, nof_hits, nof_misses = load_embedding(
+            self.params.embedding_file, self.vocab, self.params.embedding_dim)
+
+        # Track the number of words of the vocab that appeared in the
+        # pre-trained embedding
+        mlflow.log_metric("nof hits word emb", nof_hits)
+        mlflow.log_metric("nof misses word emb", nof_misses)
 
     def select_model(self):
         # Create embedding layer
@@ -76,27 +85,31 @@ class Pipeline:
         # Choose model
         # TODO: Here we should choose over a variaty of models. They could also
         # be implemented using classes
-        model = create_baseline_model(embedding_layer=embedding_layer,
-                                      nof_classes=len(self.y_train.unique()))
-        self.model = model
+        self.model = create_baseline_model(embedding_layer=embedding_layer,
+                                           nof_classes=len(
+                                               np.unique(self.y_train)))
 
     def k_fold_cross_validation(self):
+        # Get epochs, number of folds and batch size
+
+        batch_size = self.params.batch_size
+
         # Split on training to get cross-validation sets
-        skf = StratifiedKFold(n_splits=5, shuffle=False)
+        skf = StratifiedKFold(n_splits=self.params.kfolds, shuffle=False)
         for train_indices, val_indices in skf.split(self.x_train,
                                                     self.y_train):
             # Fit the model and get the history of improvement
             history = self.model.fit(self.x_train[train_indices],
                                      self.y_train[train_indices],
-                                     batch_size=128,
-                                     epochs=5,
+                                     batch_size=self.params.batch_size,
+                                     epochs=self.params.epochs,
                                      verbose=1)
             # Evaluate in validation data
-            loss, accuracy = self.model.evaluate(self.x_train[val_indices],
-                                                 self.y_train[val_indices],
-                                                 batch_size=128,
-                                                 verbose=0)
-
+            loss, accuracy = self.model.evaluate(
+                self.x_train[val_indices],
+                self.y_train[val_indices],
+                batch_size=self.params.batch_size,
+                verbose=1)
             # Get accuracy plot
             fig = plot_accuracy_curve(history.history["accuracy"])
 
@@ -104,15 +117,19 @@ class Pipeline:
             fig.savefig(
                 f"{self.params.img_path}/{self.params.experiment_name}.png")
 
-            # Track images and metrics
+            # Track images, params, and metrics
             mlflow.log_artifact(
                 f"{self.params.img_path}/{self.params.experiment_name}.png")
-            mlflow.log_params()
+
+            mlflow.log_param("seed", self.params.seed)
+            mlflow.log_param("kfolds", self.params.kfolds)
+            mlflow.log_param("epochs", self.params.epochs)
+            mlflow.log_param("batch size", batch_size)
             mlflow.log_metric("accuracy", accuracy)
             mlflow.log_metric("loss", loss)
 
     def evaluate_model(self):
-        loss, accuracy = self.model.evaluate(self.x_train,
+        loss, accuracy = self.model.evaluate(self.x_test,
                                              self.y_test,
                                              batch_size=128,
                                              verbose=0)
