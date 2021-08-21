@@ -1,6 +1,10 @@
 import numpy as np
+from keras.models import Sequential
+from keras.layers import Embedding, Dense, Flatten
+from keras.initializers import Constant
 from typing import List
 from tqdm import tqdm
+
 
 def load_embedding(filename: str, vocab: List[str],
                    embedding_dim: int) -> np.array:
@@ -30,3 +34,23 @@ def load_embedding(filename: str, vocab: List[str],
             nof_misses += 1
 
     return embedding_matrix, nof_hits, nof_misses
+
+
+def create_embedding_layer(vocab_size, embedding_dim, embedding_matrix):
+    embedding_layer = Embedding(
+        vocab_size,
+        embedding_dim,
+        embeddings_initializer=Constant(embedding_matrix),
+        trainable=False,
+    )
+
+
+def create_baseline_model(embedding_layer, nof_classes):
+    baseline = Sequential()
+    baseline.add(embedding_layer)
+    baseline.add(Dense(128, activation='relu'))
+    baseline.add(Dense(nof_classes), activation='softmax')
+    baseline.add(Flatten())
+    baseline.compile(loss='sparse_categorical_crossentropy',
+                     optimizer='adam',
+                     metrics=['accuracy'])
