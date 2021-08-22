@@ -100,12 +100,6 @@ class Pipeline:
                                     nof_classes=len(np.unique(self.y_train)))
 
     def k_fold_cross_validation(self):
-        # Log parameters
-        mlflow.log_param("seed", self.params.seed)
-        mlflow.log_param("kfolds", self.params.kfolds)
-        mlflow.log_param("epochs", self.params.epochs)
-        mlflow.log_param("batch size", self.params.batch_size)
-
         # Save initial weights
         initial_weigths = self.model.get_weights()
         
