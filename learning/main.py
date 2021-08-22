@@ -1,7 +1,7 @@
 # Data
 import numpy as np
 import pandas as pd
-# MLflow
+# MLflowf
 import mlflow
 from mlflow.tracking import MlflowClient
 # Sklearn
@@ -11,6 +11,7 @@ from models import load_embedding, create_embedding_layer, baseline_model
 from preprocess import clean_text
 from encoding import encode_labels, tokenize_features
 from parser import get_parser
+from custom_word_embedding import *
 
 
 class Pipeline:
@@ -76,6 +77,12 @@ class Pipeline:
             # pre-trained embedding
             mlflow.log_metric("nof hits - pretrained emb", nof_hits)
             mlflow.log_metric("nof misses - pretrained emb", nof_misses)
+
+        elif self.params.embedding_type == "custom":
+            # Apply custom embedding
+            self.embeddings = customised_embedding(self.x_train, self.vocab)
+
+         
             
 
 
@@ -131,12 +138,8 @@ class Pipeline:
             # Save validation accuracy and loss curves so they can be displayed
             # by mlflow
             for epoch in range(self.params.epochs):
-                mlflow.log_metric(f"fold {fold_id} accuracy curve",
-                                  history.history["accuracy"][epoch],
-                                  step=epoch)
-                mlflow.log_metric(f"fold {fold_id} loss curve",
-                                  history.history["loss"][epoch],
-                                  step=epoch)
+                mlflow.log_metric(f"fold {fold_id} accuracy curve",history.history["accuracy"][epoch],step=epoch)
+                mlflow.log_metric(f"fold {fold_id} loss curve",history.history["loss"][epoch],step=epoch)
 
 
             # Reset model for next iteration since fit method doesn't overwrite
@@ -164,12 +167,8 @@ class Pipeline:
         # Save testing accuracy and loss curves so they can be displayed
         # by mlflow
         for epoch in range(self.params.epochs):
-            mlflow.log_metric(f"test accuracy curve",
-                              history.history["accuracy"][epoch],
-                              step=epoch)
-            mlflow.log_metric(f"test loss curve",
-                              history.history["loss"][epoch],
-                              step=epoch)
+            mlflow.log_metric(f"test accuracy curve",history.history["accuracy"][epoch],step=epoch)
+            mlflow.log_metric(f"test loss curve",history.history["loss"][epoch],step=epoch)
 
         # Record test accuracy and loss.
         mlflow.log_metric("test accuracy", test_accuracy)
