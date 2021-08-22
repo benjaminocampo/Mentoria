@@ -1,6 +1,6 @@
 import numpy as np
 from keras.models import Sequential
-from keras.layers import Embedding, Dense, Flatten
+from keras.layers import Embedding, Dense, Flatten, Dropout, BatchNormalization
 from typing import List
 from tqdm import tqdm
 from urllib.request import urlopen
@@ -41,13 +41,13 @@ def load_embedding(url: str, vocab: List[str],
     return embedding_matrix, nof_hits, nof_misses
 
 
-def create_embedding_layer(vocab_size, embedding_dim, embedding_matrix):
-    return Embedding(
-        vocab_size,
-        embedding_dim,
-        weights=[embedding_matrix],
-        trainable=False,
-    )
+def create_embedding_layer(vocab_size, embedding_dim, embedding_matrix,
+                           input_length):
+    return Embedding(vocab_size,
+                     embedding_dim,
+                     weights=[embedding_matrix],
+                     trainable=False,
+                     input_length=input_length)
 
 
 def baseline_model(embedding_layer, nof_classes):
@@ -55,8 +55,8 @@ def baseline_model(embedding_layer, nof_classes):
     baseline.add(embedding_layer)
     baseline.add(Dense(units=256, activation="relu"))
     baseline.add(Dense(units=128, activation="relu"))
-    baseline.add(Dense(units=nof_classes, activation="softmax"))
     baseline.add(Flatten())
+    baseline.add(Dense(units=nof_classes, activation="softmax"))
 
     baseline.compile(loss="sparse_categorical_crossentropy",
                      optimizer="adam",
@@ -68,7 +68,9 @@ def baseline_with_dropout_model(embedding_layer, nof_classes):
     baseline = Sequential()
     baseline.add(embedding_layer)
     baseline.add(Dense(units=256, activation="relu"))
+    baseline.add(Dropout(rate=.4))
     baseline.add(Dense(units=128, activation="relu"))
+    baseline.add(Dropout(rate=.4))
     baseline.add(Dense(units=nof_classes, activation="softmax"))
     baseline.add(Flatten())
 
@@ -77,11 +79,13 @@ def baseline_with_dropout_model(embedding_layer, nof_classes):
                      metrics=["accuracy"])
     return baseline
 
-def baseline_with_batchnorm_model():
+def baseline_with_batchnorm_model(embedding_layer, nof_classes):
     baseline = Sequential()
     baseline.add(embedding_layer)
     baseline.add(Dense(units=256, activation="relu"))
+    baseline.add(BatchNormalization())
     baseline.add(Dense(units=128, activation="relu"))
+    baseline.add(BatchNormalization())
     baseline.add(Dense(units=nof_classes, activation="softmax"))
     baseline.add(Flatten())
 

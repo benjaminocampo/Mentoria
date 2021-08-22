@@ -7,7 +7,8 @@ import mlflow
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import balanced_accuracy_score
 # Utilities
-from models import load_embedding, create_embedding_layer, baseline_model
+from models import (load_embedding, create_embedding_layer, baseline_model,
+                    baseline_with_dropout_model, baseline_with_batchnorm_model)
 from preprocess import clean_text
 from encoding import encode_labels, tokenize_features
 from custom_word_embedding import customised_embedding
@@ -82,19 +83,29 @@ class Pipeline:
                                                    self.params.seed,
                                                    self.params.embedding_dim)
 
-
     def select_model(self):
+        # Get max sentence length
+        _, max_sentence_length = self.x_train.shape
+
         # Create embedding layer
         embedding_layer = create_embedding_layer(
             vocab_size=len(self.vocab) + 1,
             embedding_dim=self.params.embedding_dim,
-            embedding_matrix=self.embeddings)
+            embedding_matrix=self.embeddings,
+            input_length=max_sentence_length)
 
         # Choose model
         # TODO: Here we should choose over a variaty of models. They could also
-        # be implemented using classes
-        self.model = baseline_model(embedding_layer=embedding_layer,
-                                    nof_classes=len(np.unique(self.y_train)))
+        # be implemented using
+        if self.params.model == "base":
+            self.model = baseline_model(embedding_layer=embedding_layer,
+                                        nof_classes=len(np.unique(self.y_train)))
+        elif self.params.model == "base_wd":
+            self.model = baseline_with_dropout_model(embedding_layer=embedding_layer,
+                                        nof_classes=len(np.unique(self.y_train)))
+        elif self.params.model == "base_wbn":
+            self.model = baseline_with_batchnorm_model(embedding_layer=embedding_layer,
+                                        nof_classes=len(np.unique(self.y_train)))
 
     def k_fold_cross_validation(self):
         # Log parameters
@@ -189,6 +200,14 @@ class Pipeline:
         mlflow.log_metric("test loss", test_loss)
         mlflow.log_metric("test balanced accuracy", test_balanced_accuracy)
 
+    def save_predictions(self):
+        y_pred = np.argmax(self.model.predict(self.x_test), axis=-1)
+        predictions = pd.DataFrame(data={
+            "y_pred": y_pred,
+            "y_test": self.y_test
+        })
+        predictions.to_csv(f"{self.params.model}_predictions.csv", index=False)
+
     def run(self):
         self.load_data()
         self.preprocess_data()
@@ -197,3 +216,4 @@ class Pipeline:
         self.select_model()
         self.k_fold_cross_validation()
         self.evaluate_model()
+        self.save_predictions()
