@@ -25,4 +25,3 @@ entry_points:
     	--test_size {test_size} \
     	--epochs {epochs} \
     	--dataset_path {dataset_path}"
-		
