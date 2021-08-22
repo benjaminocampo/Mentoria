@@ -1,14 +1,10 @@
 import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Flatten, Embedding, Dot
-from tensorflow.keras.preprocessing import sequence
-
-import io
 import tqdm
-from typing import List
-
 import pandas as pd
 import numpy as np
+
 
 class Word2Vec(Model):
     """
@@ -34,7 +30,7 @@ class Word2Vec(Model):
         dots = self.dots([context_emb, word_emb])
         return self.flatten(dots)
 
-    
+
 def generate_skipgram_training_data(sequences: np.array, window_size: int,
                                     num_ns: int, vocab_size: int,
                                     batch_size: int, buffer_size: int,
@@ -96,68 +92,29 @@ def generate_skipgram_training_data(sequences: np.array, window_size: int,
 
     return dataset
 
-def save_embedding(vocab: List[str], weights: np.array) -> None:
-    """
-    Given a list of words and a its corresponding weights, it saves them in
-    files metadata.tsv and vectors.tsv respectively.
-    """
-    out_vectors = io.open('vectors.tsv', 'w', encoding='utf-8')
-    out_metadata = io.open('metadata.tsv', 'w', encoding='utf-8')
 
-    for index, word in enumerate(vocab):
-        if index != 0:
-            vec = weights[index]
-            out_vectors.write('\t'.join([str(x) for x in vec]) + "\n")
-            out_metadata.write(word + "\n")
-    out_vectors.close()
-    out_metadata.close()   
-
-
-def customised_embedding(encoded_titles,vocab):
-    _, long_sentence_size = y_train.shape
+def customised_embedding(encoded_titles, vocab, seed, embedding_dim):
     nof_dim_out_of_vocab = 1
     vocab_size = len(vocab) + nof_dim_out_of_vocab
-    output_dim = 64
 
-    embedding_layer = Embedding(vocab_size, output_dim, input_length=long_sentence_size)
-
-    weights = embedding_layer.get_weights()[0]
-
-    """
-        Para entrenar los parámetros presentes en `weights` se usó `word2vec`, que genera *skip-grams* mediante una lista de oraciones. 
-
-        Cada *skip-grams* es un par de palabras `(target, context)` donde a cada palabra `target`, se le asocia otra denominada `context` 
-        que puede o no encontrarse en su contexto. Así se tienen *skip-grams* positivo y negativos. 
-
-        Para cada palabra en el vocabulario, se genera un *skip-gram* positivo y una cantidad
-        `nof_negative_skipgrams` negativos. Se los usa para entrenar un *embedding* personalizado. 
-    """
-
-    seed = 42
     nof_negative_skipgrams = 4
-    
-    dataset = generate_skipgram_training_data(
-                sequences=encoded_titles,
-                window_size=2,
-                num_ns=4,
-                vocab_size=vocab_size,
-                seed=seed,
-                batch_size=1024,
-                buffer_size=10000
-                )
 
-    embedding_dim = 128
+    dataset = generate_skipgram_training_data(sequences=encoded_titles,
+                                              window_size=2,
+                                              num_ns=4,
+                                              vocab_size=vocab_size,
+                                              seed=seed,
+                                              batch_size=1024,
+                                              buffer_size=10000)
+
     word2vec = Word2Vec(vocab_size, embedding_dim, nof_negative_skipgrams)
-    word2vec.compile(optimizer='adam',
-                        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
-                        metrics=['accuracy']
-                    )
+    word2vec.compile(
+        optimizer='adam',
+        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
+        metrics=['accuracy'])
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="logs")
     word2vec.fit(dataset, epochs=20, callbacks=[tensorboard_callback])
 
     weights = word2vec.get_layer('w2v_embedding').get_weights()[0]
-    
-    return weights 
-    
-    #save_embedding(vocab, weights)
-    #Se utilizó la función `save_embedding` para almacenar en 2 archivos separados de manera estructurada para cada palabra en vocab su representación vectorial.
+
+    return weights

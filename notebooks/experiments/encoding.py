@@ -1,5 +1,6 @@
 from sklearn.preprocessing import LabelEncoder
 from keras.preprocessing import text, sequence
+import numpy as np
 
 
 def tokenize_features(x_train, x_test):
@@ -19,10 +20,14 @@ def tokenize_features(x_train, x_test):
 
     maxim = max(x_train.shape[1], x_test.shape[1])
     if x_train.shape[1] < maxim:
-        x_train = np.hstack((x_train, np.zeros((x_train.shape[0], maxim- x_train.shape[1])))
+        x_train = np.hstack(
+            [x_train,
+             np.zeros((x_train.shape[0], maxim - x_train.shape[1]))])
     if x_test.shape[1] < maxim:
-        x_test = np.hstack((x_test, np.zeros((x_test.shape[0], maxim - x_test.shape[1])))
-    
+        x_test = np.hstack(
+            [x_test,
+             np.zeros((x_test.shape[0], maxim - x_test.shape[1]))])
+
     # Get learned vocabulary from tokenization
     vocab = word_tokenizer.word_index.keys()
 

@@ -3,15 +3,14 @@ import numpy as np
 import pandas as pd
 # MLflowf
 import mlflow
-from mlflow.tracking import MlflowClient
 # Sklearn
 from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.metrics import balanced_accuracy_score
 # Utilities
 from models import load_embedding, create_embedding_layer, baseline_model
 from preprocess import clean_text
 from encoding import encode_labels, tokenize_features
-from parser import get_parser
-from custom_word_embedding import *
+from custom_word_embedding import customised_embedding
 
 
 class Pipeline:
@@ -68,22 +67,20 @@ class Pipeline:
         # Encode training and testing labels
         self.y_train, self.y_test = encode_labels(self.y_train, self.y_test)
 
-        
+
         if self.params.embedding_type == "pretrained":
             # Load pre-trained embeddings
             self.embeddings, nof_hits, nof_misses = load_embedding(
                 self.params.embedding_url, self.vocab, self.params.embedding_dim)
             # Track the number of words of the vocab that appeared in the
             # pre-trained embedding
-            mlflow.log_metric("nof hits - pretrained emb", nof_hits)
-            mlflow.log_metric("nof misses - pretrained emb", nof_misses)
-
+            mlflow.log_metric("nof hits / pretrained emb", nof_hits)
+            mlflow.log_metric("nof misses / pretrained emb", nof_misses)
         elif self.params.embedding_type == "custom":
             # Apply custom embedding
-            self.embeddings = customised_embedding(self.x_train, self.vocab)
-
-         
-            
+            self.embeddings = customised_embedding(self.x_train, self.vocab,
+                                                   self.params.seed,
+                                                   self.params.embedding_dim)
 
 
     def select_model(self):
@@ -108,10 +105,11 @@ class Pipeline:
 
         # Save initial weights
         initial_weigths = self.model.get_weights()
-        
+
         # Init validation metric recorders
         val_accuracy = []
         val_loss = []
+        val_balanced_accuracy = []
 
         # Split on training to get cross-validation sets
         skf = StratifiedKFold(n_splits=self.params.kfolds, shuffle=False)
@@ -131,9 +129,18 @@ class Pipeline:
                 batch_size=self.params.batch_size,
                 verbose=1)
 
-            # Record accuracy and loss
+            # Predict validation labels
+            y_pred = np.argmax(self.model.predict(self.x_train[val_indices]),
+                               axis=-1)
+
+            # Calculate balanced accuracy
+            balanced_accuracy = balanced_accuracy_score(
+                self.y_train[val_indices], y_pred)
+
+            # Record accuracy, loss, and balanced accuracy
             val_accuracy.append(accuracy)
             val_loss.append(loss)
+            val_balanced_accuracy.append(balanced_accuracy)
 
             # Save validation accuracy and loss curves so they can be displayed
             # by mlflow
@@ -145,10 +152,11 @@ class Pipeline:
             # Reset model for next iteration since fit method doesn't overwrite
             # previous training iterations
             self.model.set_weights(initial_weigths)
-        
+
         # Record mean accuracy and loss
         mlflow.log_metric("mean val accuracy", np.mean(val_accuracy))
         mlflow.log_metric("mean val loss", np.mean(val_loss))
+        mlflow.log_metric("mean val balanced accuracy", np.mean(balanced_accuracy))
 
     def evaluate_model(self):
         # Train model again but this time using all training data
@@ -157,12 +165,18 @@ class Pipeline:
                                  batch_size=self.params.batch_size,
                                  epochs=self.params.epochs,
                                  verbose=1)
-        
+
         # Evaluate in testing data
         test_loss, test_accuracy = self.model.evaluate(self.x_test,
                                              self.y_test,
                                              batch_size=self.params.batch_size,
                                              verbose=1)
+
+        # Predict test labels
+        y_pred = np.argmax(self.model.predict(self.x_test), axis=-1)
+
+        # Calculate balanced accuracy
+        test_balanced_accuracy = balanced_accuracy_score(self.y_test, y_pred)
 
         # Save testing accuracy and loss curves so they can be displayed
         # by mlflow
@@ -173,6 +187,7 @@ class Pipeline:
         # Record test accuracy and loss.
         mlflow.log_metric("test accuracy", test_accuracy)
         mlflow.log_metric("test loss", test_loss)
+        mlflow.log_metric("test balanced accuracy", test_balanced_accuracy)
 
     def run(self):
         self.load_data()
@@ -182,16 +197,3 @@ class Pipeline:
         self.select_model()
         self.k_fold_cross_validation()
         self.evaluate_model()
-
-
-if __name__ == '__main__':
-    parser = get_parser()
-
-    # Get arguments given by command line
-    params = parser.parse_args()
-
-    # Initialize mlflow context
-    with mlflow.start_run():
-        # Run pipeline
-        pipeline = Pipeline(params)
-        pipeline.run()
