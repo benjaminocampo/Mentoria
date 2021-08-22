@@ -22,10 +22,6 @@ def get_parser():
                         help="dimension used in word embeddings",
                         type=int,
                         default=300)
-    parser.add_argument("--embedding_file",
-                        help="filename of pre-trained word embeddings",
-                        type=str,
-                        default="wiki.pt.vec")
     parser.add_argument("--nof_samples",
                         help="number of samples used of the dataset",
                         type=int,
