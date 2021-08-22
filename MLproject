@@ -4,7 +4,6 @@ conda_env: environment.yml
 entry_points:
   main:
     parameters:
-      experiment_name: {type: string, default: baseline}
       kfolds: {type: int, default: 5}
       seed: {type: int, default: 0}
       batch_size: {type: int, default: 128}
@@ -16,7 +15,6 @@ entry_points:
       epochs: {type: int, default: 5}
       dataset_url: {type: string, default: "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"}
     command: "python learning/main.py \
-    	--experiment_name {experiment_name} \
     	--kfolds {kfolds} \
     	--seed {seed} \
     	--batch_size {batch_size} \

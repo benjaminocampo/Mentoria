@@ -3,9 +3,6 @@ import argparse
 
 def get_parser():
     parser = argparse.ArgumentParser(description="Process model arguments")
-    parser.add_argument("--experiment_name",
-                        help="name used by mlflow to record your experiments",
-                        required=True)
     parser.add_argument("--kfolds",
                         help="number of folds used in cross-validation",
                         type=int,
@@ -47,12 +44,10 @@ def get_parser():
         default=
         "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"
     )
-    parser.add_argument(
-            "--embedding_type",
-            help="pretrained or custom word embeddings",
-            choices=["pretrained", "custom"],
-            default="pretrained"
-        )
-        
+    parser.add_argument("--embedding_type",
+                        help="pretrained or custom word embeddings",
+                        choices=["pretrained", "custom"],
+                        default="pretrained")
+
 
     return parser

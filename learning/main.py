@@ -191,15 +191,8 @@ if __name__ == '__main__':
     # Get arguments given by command line
     params = parser.parse_args()
 
-    # Init Mlflow client
-    client = MlflowClient()
-
-    # Creates a new experiment
-    experiment_id = client.create_experiment(params.experiment_name)
-
     # Initialize mlflow context
-    with mlflow.start_run(experiment_id=experiment_id,
-                          run_name=params.experiment_name):
+    with mlflow.start_run():
         # Run pipeline
         pipeline = Pipeline(params)
         pipeline.run()
