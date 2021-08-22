@@ -21,7 +21,7 @@ entry_points:
     	--seed {seed} \
     	--batch_size {batch_size} \
     	--embedding_dim {embedding_dim} \
-    	--embedding_url {embedding_file} \
+    	--embedding_url {embedding_url} \
       --embedding_type {embedding_type} \
     	--nof_samples {nof_samples} \
     	--test_size {test_size} \
