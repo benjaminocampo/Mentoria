@@ -26,6 +26,10 @@ def get_parser():
                         help="filename of pre-trained word embeddings",
                         type=str,
                         default="wiki.pt.vec")
+    parser.add_argument("--nof_samples",
+                        help="number of samples used of the dataset",
+                        type=int,
+                        default=5000)
     parser.add_argument(
         "--test_size",
         help="test size percentage used in stratified sampling splitting",
@@ -35,10 +39,6 @@ def get_parser():
                         help="Number of epochs used when validating",
                         type=float,
                         default=5)
-    parser.add_argument(
-        "--img_path",
-        help="url indicating where the output directory of images is located",
-        default="plots")
     parser.add_argument(
         "--dataset_path",
         help="url of where the database is located",

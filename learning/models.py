@@ -18,6 +18,7 @@ def load_embedding(filename: str, vocab: List[str],
     nof_hits = 0
     nof_misses = 0
 
+    # Read embedding vectors from @filename and save them in a dictionary
     embedding_indexes = {}
     with open(filename) as f:
         _, _ = map(int, f.readline().split())
@@ -25,6 +26,8 @@ def load_embedding(filename: str, vocab: List[str],
             word, *coef = line.rstrip().split(' ')
             embedding_indexes[word] = np.asarray(coef, dtype=float)
 
+    # Use previous dictionary to look up the words in @vocab so they are
+    # assigned a vector
     embedding_matrix = np.zeros((vocab_size, embedding_dim))
     for index, word in tqdm(enumerate(vocab)):
         vector = embedding_indexes.get(word)
@@ -51,14 +54,9 @@ def baseline_model(embedding_layer, nof_classes):
 
     # Add embedding layer
     baseline.add(embedding_layer)
-
-    # Tune the number of units in the first Dense layer
-    # hp_units = hp.Int("units", min_value=32, max_value=512, step=32)
     baseline.add(Dense(units=128, activation="relu"))
-    baseline.add(Dense(nof_classes, activation="softmax"))
+    baseline.add(Dense(units=nof_classes, activation="softmax"))
     baseline.add(Flatten())
-
-    #hp_learning_rate = hp.Choice("learning_rate", values=[1e-2, 1e-3, 1e-4])
     baseline.compile(loss="sparse_categorical_crossentropy",
                      optimizer=Adam(),
                      metrics=["accuracy"])

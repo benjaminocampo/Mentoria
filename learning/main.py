@@ -1,5 +1,3 @@
-# Tqdm
-from tqdm import tqdm
 # Data
 import numpy as np
 import pandas as pd
@@ -35,7 +33,10 @@ class Pipeline:
         # Read dataset
         self.dataset = pd.read_csv(self.dataset_path)
 
-        self.dataset = self.dataset.sample(5000, random_state=self.params.seed)
+        # Sample dataset only when it is given by command line
+        if self.params.nof_samples is not None:
+            self.dataset = self.dataset.sample(self.params.nof_samples,
+                                               random_state=self.params.seed)
 
     def preprocess_data(self):
         # Remove numbers, symbols, special chars, contractions, etc.
@@ -95,9 +96,13 @@ class Pipeline:
         mlflow.log_param("epochs", self.params.epochs)
         mlflow.log_param("batch size", self.params.batch_size)
 
+        # Save initial weights
         initial_weigths = self.model.get_weights()
+        
+        # Init validation metric recorders
         val_accuracy = []
         val_loss = []
+
         # Split on training to get cross-validation sets
         skf = StratifiedKFold(n_splits=self.params.kfolds, shuffle=False)
         for fold_id, (train_indices, val_indices) in enumerate(
@@ -108,6 +113,7 @@ class Pipeline:
                                      batch_size=self.params.batch_size,
                                      epochs=self.params.epochs,
                                      verbose=1)
+
             # Evaluate in validation data
             loss, accuracy = self.model.evaluate(
                 self.x_train[val_indices],
@@ -115,9 +121,12 @@ class Pipeline:
                 batch_size=self.params.batch_size,
                 verbose=1)
 
+            # Record accuracy and loss
             val_accuracy.append(accuracy)
             val_loss.append(loss)
 
+            # Save validation accuracy and loss curves so they can be displayed
+            # by mlflow
             for epoch in range(self.params.epochs):
                 mlflow.log_metric(f"fold {fold_id} accuracy curve",
                                   history.history["accuracy"][epoch],
@@ -127,10 +136,11 @@ class Pipeline:
                                   step=epoch)
 
 
-            # Predecir los y's usando self.model, pasandoles x_train 
-
-            # Reset model for next iteration
+            # Reset model for next iteration since fit method doesn't overwrite
+            # previous training iterations
             self.model.set_weights(initial_weigths)
+        
+        # Record mean accuracy and loss
         mlflow.log_metric("mean val accuracy", np.mean(val_accuracy))
         mlflow.log_metric("mean val loss", np.mean(val_loss))
 
@@ -141,11 +151,15 @@ class Pipeline:
                                  batch_size=self.params.batch_size,
                                  epochs=self.params.epochs,
                                  verbose=1)
-        loss, accuracy = self.model.evaluate(self.x_test,
+        
+        # Evaluate in testing data
+        test_loss, test_accuracy = self.model.evaluate(self.x_test,
                                              self.y_test,
                                              batch_size=self.params.batch_size,
                                              verbose=1)
 
+        # Save testing accuracy and loss curves so they can be displayed
+        # by mlflow
         for epoch in range(self.params.epochs):
             mlflow.log_metric(f"test accuracy curve",
                               history.history["accuracy"][epoch],
@@ -154,8 +168,9 @@ class Pipeline:
                               history.history["loss"][epoch],
                               step=epoch)
 
-        mlflow.log_metric("test accuracy", accuracy)
-        mlflow.log_metric("test loss", loss)
+        # Record test accuracy and loss.
+        mlflow.log_metric("test accuracy", test_accuracy)
+        mlflow.log_metric("test loss", test_loss)
 
     def run(self):
         self.load_data()
@@ -170,6 +185,7 @@ class Pipeline:
 if __name__ == '__main__':
     parser = get_parser()
 
+    # Get arguments given by command line
     params = parser.parse_args()
 
     # Init Mlflow client
