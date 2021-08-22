@@ -16,7 +16,7 @@ from parser import get_parser
 class Pipeline:
     def __init__(self, params):
         self.params = params
-        self.dataset_path = params.dataset_path
+        self.dataset_url = params.dataset_url
         self.dataset = None
         self.x = None
         self.y = None
@@ -31,7 +31,7 @@ class Pipeline:
 
     def load_data(self):
         # Read dataset
-        self.dataset = pd.read_csv(self.dataset_path)
+        self.dataset = pd.read_csv(self.dataset_url)
 
         # Sample dataset only when it is given by command line
         if self.params.nof_samples is not None:
@@ -67,14 +67,17 @@ class Pipeline:
         # Encode training and testing labels
         self.y_train, self.y_test = encode_labels(self.y_train, self.y_test)
 
-        # Load pre-trained embeddings
-        self.embeddings, nof_hits, nof_misses = load_embedding(
-            self.params.embedding_file, self.vocab, self.params.embedding_dim)
+        
+        if self.params.embedding_type == "pretrained":
+            # Load pre-trained embeddings
+            self.embeddings, nof_hits, nof_misses = load_embedding(
+                self.params.embedding_url, self.vocab, self.params.embedding_dim)
+            # Track the number of words of the vocab that appeared in the
+            # pre-trained embedding
+            mlflow.log_metric("nof hits - pretrained emb", nof_hits)
+            mlflow.log_metric("nof misses - pretrained emb", nof_misses)
+            
 
-        # Track the number of words of the vocab that appeared in the
-        # pre-trained embedding
-        mlflow.log_metric("nof hits word emb", nof_hits)
-        mlflow.log_metric("nof misses word emb", nof_misses)
 
     def select_model(self):
         # Create embedding layer

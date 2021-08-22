@@ -9,19 +9,21 @@ entry_points:
       seed: {type: int, default: 0}
       batch_size: {type: int, default: 128}
       embedding_dim: {type: int, default: 300}
-      embedding_file: {type: string, default: "wiki.pt.vec"}
+      embedding_url: {type: string, default: "https://www.famaf.unc.edu.ar/~nocampo043/fasttext_sp_pt.vec"}
+      embedding_type: {type: string, default: "pretrained"}
       nof_samples: {type: int, default: 5000}
       test_size: {type: float, default: 0.2}
       epochs: {type: int, default: 5}
-      dataset_path: {type: string, default: "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"}
+      dataset_url: {type: string, default: "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"}
     command: "python learning/main.py \
     	--experiment_name {experiment_name} \
     	--kfolds {kfolds} \
     	--seed {seed} \
     	--batch_size {batch_size} \
     	--embedding_dim {embedding_dim} \
-    	--embedding_file {embedding_file} \
+    	--embedding_url {embedding_file} \
+      --embedding_type {embedding_type} \
     	--nof_samples {nof_samples} \
     	--test_size {test_size} \
     	--epochs {epochs} \
-    	--dataset_path {dataset_path}"
+    	--dataset_url {dataset_url}"

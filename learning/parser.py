@@ -40,10 +40,23 @@ def get_parser():
                         type=float,
                         default=5)
     parser.add_argument(
-        "--dataset_path",
+        "--embedding_url",
+        help="url of where the pretrained embedding is located",
+        default=
+        "https://www.famaf.unc.edu.ar/~nocampo043/fasttext_sp_pt.vec"
+    )
+    parser.add_argument(
+        "--dataset_url",
         help="url of where the database is located",
         default=
         "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"
     )
+    parser.add_argument(
+            "--embedding_type",
+            help="pretrained or custom word embeddings",
+            choices=["pretrained", "custom"],
+            default="pretrained"
+        )
+        
 
     return parser
