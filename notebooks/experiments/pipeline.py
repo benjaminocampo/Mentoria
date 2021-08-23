@@ -25,8 +25,7 @@ class Pipeline:
         self.x_test = None
         self.y_train = None
         self.y_test = None
-        self.train_label_quality = None
-        self.test_label_quality = None
+
         self.model = None
         self.embeddings = None
         self.vocab = None
@@ -50,9 +49,8 @@ class Pipeline:
         self.dataset = self.dataset.assign(cleaned_title=cleaned_title_col)
 
         # Set titles and categories as features and labels
-        self.x = self.dataset[["cleaned_title","label_quality"]]
+        self.x = self.dataset["cleaned_title"]
         self.y = self.dataset["category"]
-
 
     def split_data(self):
         # Split dataset into training and testing instances
@@ -61,14 +59,6 @@ class Pipeline:
             self.y,
             test_size=self.params.test_size,
             random_state=self.params.seed)
-
-        self.train_label_quality = self.x_train["label_quality"]
-        self.test_label_quality = self.x_test["label_quality"]
-        
-        self.x_train = self.x_train["cleaned_title"]
-        self.x_test = self.x_test["cleaned_title"]
-        
-
 
     def encode_data(self):
         # Encode training and testing titles separately
@@ -131,8 +121,6 @@ class Pipeline:
         val_accuracy = []
         val_loss = []
         val_balanced_accuracy = []
-        val_label_quality_reliable = []
-        val_label_quality_unreliable = []
 
         # Split on training to get cross-validation sets
         skf = StratifiedKFold(n_splits=self.params.kfolds, shuffle=False)
@@ -152,22 +140,6 @@ class Pipeline:
                 batch_size=self.params.batch_size,
                 verbose=1)
 
-            val_reliable_indices = self.train_label_quality.loc[self.train_label_quality["label_quality"] == "reliable", val_indices].index
-
-            _,accuracy_label_quality_reliable = self.model.evaluate(
-                self.x_train[val_reliable_indices],
-                self.y_train[val_reliable_indices],
-                batch_size=self.params.batch_size,
-                verbose=1)
-
-            val_unreliable_indices = self.train_label_quality.loc[self.train_label_quality["label_quality"] == "unreliable", val_indices].index
-
-            _,accuracy_label_quality_unreliable = self.model.evaluate(
-                self.x_train[val_unreliable_indices],
-                self.y_train[val_unreliable_indices],
-                batch_size=self.params.batch_size,
-                verbose=1)
-
             # Predict validation labels
             y_pred = np.argmax(self.model.predict(self.x_train[val_indices]),
                                axis=-1)
@@ -180,17 +152,13 @@ class Pipeline:
             val_accuracy.append(accuracy)
             val_loss.append(loss)
             val_balanced_accuracy.append(balanced_accuracy)
-            val_label_quality_reliable.append(accuracy_label_quality_reliable)
-            val_label_quality_unreliable.append(accuracy_label_quality_unreliable)
-
-
-
 
             # Save validation accuracy and loss curves so they can be displayed
             # by mlflow
             for epoch in range(self.params.epochs):
                 mlflow.log_metric(f"fold {fold_id} accuracy curve",history.history["accuracy"][epoch],step=epoch)
                 mlflow.log_metric(f"fold {fold_id} loss curve",history.history["loss"][epoch],step=epoch)
+
 
             # Reset model for next iteration since fit method doesn't overwrite
             # previous training iterations
@@ -200,9 +168,6 @@ class Pipeline:
         mlflow.log_metric("mean val accuracy", np.mean(val_accuracy))
         mlflow.log_metric("mean val loss", np.mean(val_loss))
         mlflow.log_metric("mean val balanced accuracy", np.mean(balanced_accuracy))
-        mlflow.log_metric("mean val reliable accuracy", np.mean(val_label_quality_reliable))
-        mlflow.log_metric("mean val unreliable accuracy", np.mean(val_label_quality_unreliable))
-
 
     def evaluate_model(self):
         # Train model again but this time using all training data
@@ -224,40 +189,16 @@ class Pipeline:
         # Calculate balanced accuracy
         test_balanced_accuracy = balanced_accuracy_score(self.y_test, y_pred)
 
-
-
         # Save testing accuracy and loss curves so they can be displayed
         # by mlflow
         for epoch in range(self.params.epochs):
             mlflow.log_metric(f"test accuracy curve",history.history["accuracy"][epoch],step=epoch)
             mlflow.log_metric(f"test loss curve",history.history["loss"][epoch],step=epoch)
 
-
-        test_reliable_indices = self.test_label_quality.loc[self.test_label_quality["label_quality"] == "reliable"].index
-
-        _, accuracy_test_label_quality_reliable = self.model.evaluate(
-            self.x_train[test_reliable_indices],
-            self.y_train[test_reliable_indices],
-            batch_size=self.params.batch_size,
-            verbose=1)
-
-        test_unreliable_indices = self.test_label_quality.loc[self.test_label_quality["label_quality"] == "unreliable"].index
-
-        _, accuracy_test_label_quality_unreliable = self.model.evaluate(
-            self.x_train[test_unreliable_indices],
-            self.y_train[test_unreliable_indices],
-            batch_size=self.params.batch_size,
-            verbose=1)
-
-
-
         # Record test accuracy and loss.
         mlflow.log_metric("test accuracy", test_accuracy)
         mlflow.log_metric("test loss", test_loss)
         mlflow.log_metric("test balanced accuracy", test_balanced_accuracy)
-        mlflow.log_metric("test reliable accuracy", accuracy_test_label_quality_reliable)
-        mlflow.log_metric("test unreliable accuracy",accuracy_test_label_quality_unreliable)
-
 
     def save_predictions(self):
         y_pred = np.argmax(self.model.predict(self.x_test), axis=-1)
