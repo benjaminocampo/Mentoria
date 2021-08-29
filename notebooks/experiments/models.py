@@ -1,14 +1,13 @@
 import numpy as np
 from keras.models import Sequential
-from keras.layers import Embedding, Dense, Flatten, Dropout, BatchNormalization
+from keras.layers import Input, Embedding, Dense, Flatten, Dropout, BatchNormalization
 from typing import List
 from tqdm import tqdm
 from urllib.request import urlopen
-import pdb
+import tensorflow as tf
 
 
-def load_embedding(url: str, vocab: List[str],
-                   embedding_dim: int) -> np.array:
+def load_embedding(url: str, vocab: List[str], embedding_dim: int) -> np.array:
     """
     Given a path in your local system of an embedding file where each line has
     the embedded vector of dimension @embedding_dim separated by spaces, returns
@@ -50,46 +49,54 @@ def create_embedding_layer(vocab_size, embedding_dim, embedding_matrix,
                      input_length=input_length)
 
 
-def baseline_model(embedding_layer, nof_classes):
-    baseline = Sequential()
-    baseline.add(embedding_layer)
-    baseline.add(Dense(units=256, activation="relu"))
-    baseline.add(Dense(units=128, activation="relu"))
-    baseline.add(Flatten())
-    baseline.add(Dense(units=nof_classes, activation="softmax"))
+def baseline_model(vectorize_layer, embedding_layer, nof_classes):
+    model = Sequential()
+    model.add(Input(shape=(1,), dtype=tf.string))
+    model.add(vectorize_layer)
+    model.add(embedding_layer)
+    model.add(Dense(units=256, activation="relu"))
+    model.add(Dense(units=128, activation="relu"))
+    model.add(Flatten())
+    model.add(Dense(units=nof_classes, activation="softmax"))
 
-    baseline.compile(loss="sparse_categorical_crossentropy",
+    model.compile(loss="sparse_categorical_crossentropy",
                      optimizer="adam",
                      metrics=["accuracy"])
-    return baseline
+    return model
 
 
-def baseline_with_dropout_model(embedding_layer, nof_classes):
-    baseline = Sequential()
-    baseline.add(embedding_layer)
-    baseline.add(Dense(units=256, activation="relu"))
-    baseline.add(Dropout(rate=.4))
-    baseline.add(Dense(units=128, activation="relu"))
-    baseline.add(Dropout(rate=.4))
-    baseline.add(Dense(units=nof_classes, activation="softmax"))
-    baseline.add(Flatten())
+def baseline_with_dropout_model(vectorize_layer, embedding_layer, nof_classes):
+    model = Sequential()
+    model.add(Input(shape=(1,), dtype=tf.string))
+    model.add(vectorize_layer)
+    model.add(embedding_layer)
+    model.add(Dense(units=256, activation="relu"))
+    model.add(Dropout(rate=.4))
+    model.add(Dense(units=128, activation="relu"))
+    model.add(Dropout(rate=.4))
+    model.add(Flatten())
+    model.add(Dense(units=nof_classes, activation="softmax"))
 
-    baseline.compile(loss="sparse_categorical_crossentropy",
+    model.compile(loss="sparse_categorical_crossentropy",
                      optimizer="adam",
                      metrics=["accuracy"])
-    return baseline
+    return model
 
-def baseline_with_batchnorm_model(embedding_layer, nof_classes):
-    baseline = Sequential()
-    baseline.add(embedding_layer)
-    baseline.add(Dense(units=256, activation="relu"))
-    baseline.add(BatchNormalization())
-    baseline.add(Dense(units=128, activation="relu"))
-    baseline.add(BatchNormalization())
-    baseline.add(Dense(units=nof_classes, activation="softmax"))
-    baseline.add(Flatten())
 
-    baseline.compile(loss="sparse_categorical_crossentropy",
+def baseline_with_batchnorm_model(vectorize_layer, embedding_layer,
+                                  nof_classes):
+    model = Sequential()
+    model.add(Input(shape=(1,), dtype=tf.string))
+    model.add(vectorize_layer)
+    model.add(embedding_layer)
+    model.add(Dense(units=256, activation="relu"))
+    model.add(BatchNormalization())
+    model.add(Dense(units=128, activation="relu"))
+    model.add(BatchNormalization())
+    model.add(Flatten())
+    model.add(Dense(units=nof_classes, activation="softmax"))
+
+    model.compile(loss="sparse_categorical_crossentropy",
                      optimizer="adam",
                      metrics=["accuracy"])
-    return baseline
+    return model

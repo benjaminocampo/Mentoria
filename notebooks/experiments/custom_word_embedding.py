@@ -2,7 +2,6 @@ import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Flatten, Embedding, Dot
 import tqdm
-import pandas as pd
 import numpy as np
 
 
@@ -93,12 +92,8 @@ def generate_skipgram_training_data(sequences: np.array, window_size: int,
     return dataset
 
 
-def customised_embedding(encoded_titles, vocab, seed, embedding_dim):
-    nof_dim_out_of_vocab = 1
-    vocab_size = len(vocab) + nof_dim_out_of_vocab
-
+def customised_embedding(encoded_titles, vocab_size, seed, embedding_dim):
     nof_negative_skipgrams = 4
-
     dataset = generate_skipgram_training_data(sequences=encoded_titles,
                                               window_size=2,
                                               num_ns=4,
