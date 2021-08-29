@@ -50,6 +50,10 @@ import numpy as np
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Flatten, Embedding, Dot
 from tensorflow.keras.preprocessing import text, sequence
+from tensorflow.keras.layers.experimental.preprocessing import TextVectorization
+
+from keras.models import Sequential
+from keras.layers import Input
 
 from sklearn.preprocessing import LabelEncoder
 from unidecode import unidecode
@@ -335,10 +339,6 @@ se puede definir una capa `vectorize_layer` donde se realicen los pasos
 descriptos en la subsección anterior como parte del modelo.
 """
 # %%
-from tensorflow.keras.layers.experimental.preprocessing import TextVectorization
-from keras.models import Sequential
-from keras.layers import Input
-
 length_long_sentence = (
     df["cleaned_title"]
         .apply(lambda s: s.split())
