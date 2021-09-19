@@ -7,11 +7,8 @@ import mlflow
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import balanced_accuracy_score
 # Utilities
-from models import (load_embedding, create_embedding_layer, baseline_model,
-                    baseline_with_dropout_model, baseline_with_batchnorm_model)
 from preprocess import clean_text
-from encoding import create_vectorize_layer, encode_labels
-from custom_word_embedding import customised_embedding
+from encoding import encode_labels
 
 
 class Pipeline:
@@ -48,9 +45,12 @@ class Pipeline:
         # Add @cleaned_title column to dataset
         self.dataset = self.dataset.assign(cleaned_title=cleaned_title_col)
 
+        self.dataset = self.dataset.assign(
+            encoded_category=encode_labels(self.dataset["category"]))
+
         # Set titles and categories as features and labels
         self.x = self.dataset["cleaned_title"]
-        self.y = self.dataset["category"]
+        self.y = self.dataset["encoded_category"]
 
     def split_data(self):
         # Split dataset into training and testing instances
@@ -60,72 +60,7 @@ class Pipeline:
             test_size=self.params.test_size,
             random_state=self.params.seed)
 
-    def encode_data(self):
-        # Get the longest title length
-        length_long_sentence = (
-            self.dataset["cleaned_title"]
-                .apply(lambda s: s.split())
-                .apply(lambda s: len(s))
-                .max()
-        )
-        # Set frequencies as the vectorize method
-        output_mode = "int"
-
-        # Create vectorize layer
-        self.vectorize_layer = create_vectorize_layer(length_long_sentence,
-                                                      output_mode)
-
-        # Fit vectorize layer but only with training data
-        self.vectorize_layer.adapt(self.x_train.values)
-
-        # Save vocab size
-        self.vocab_size = len(self.vectorize_layer.get_vocabulary())
-
-        # Encode training and testing labels
-        self.y_train, self.y_test = encode_labels(self.y_train, self.y_test)
-
-        # Choose between pretrained or custom embeddings
-        if self.params.embedding_type == "pretrained":
-            self.embedding_matrix, nof_hits, nof_misses = load_embedding(
-                self.params.embedding_url, self.vocab,
-                self.params.embedding_dim)
-
-            # Track the number of hits, i.e, vocab words that occurred in the
-            # pretrained embedding
-            mlflow.log_metric("nof hits / pretrained emb", nof_hits)
-            mlflow.log_metric("nof misses / pretrained emb", nof_misses)
-        elif self.params.embedding_type == "custom":
-            # Train custom embedding
-            self.embedding_matrix = customised_embedding(
-                self.vectorize_layer(self.x_train).numpy(), self.vocab_size,
-                self.params.seed, self.params.embedding_dim)
-
-        # Create embedding layer
-        self.embedding_layer = create_embedding_layer(
-            vocab_size=self.vocab_size,
-            embedding_dim=self.params.embedding_dim,
-            embedding_matrix=self.embedding_matrix,
-            input_length=length_long_sentence)
-
-    def select_model(self):
-        # Choose previously defined models
-        if self.params.model == "base":
-            self.model = baseline_model(
-                self.vectorize_layer,
-                self.embedding_layer,
-                nof_classes=len(np.unique(self.y_train)))
-        elif self.params.model == "base_wd":
-            self.model = baseline_with_dropout_model(
-                self.vectorize_layer,
-                self.embedding_layer,
-                nof_classes=len(np.unique(self.y_train)))
-        elif self.params.model == "base_wbn":
-            self.model = baseline_with_batchnorm_model(
-                self.vectorize_layer,
-                self.embedding_layer,
-                nof_classes=len(np.unique(self.y_train)))
-
-    def k_fold_cross_validation(self):
+    def k_fold_cross_validation(self, model):
         # Log parameters
         mlflow.log_param("seed", self.params.seed)
         mlflow.log_param("kfolds", self.params.kfolds)
@@ -133,7 +68,7 @@ class Pipeline:
         mlflow.log_param("batch size", self.params.batch_size)
 
         # Save initial weights
-        initial_weigths = self.model.get_weights()
+        initial_weigths = model.get_weights()
 
         # Init validation metric recorders
         stats = pd.DataFrame(columns=[
@@ -147,42 +82,41 @@ class Pipeline:
             "rel_bcd_acc",
             "unrel_bcd_acc"
         ])
-
         # Split on training to get cross-validation sets
         skf = StratifiedKFold(n_splits=self.params.kfolds, shuffle=False)
         for fold_id, (train_indices, val_indices) in enumerate(
                 skf.split(self.x_train, self.y_train)):
             # Fit the model and get the history of improvement
-            history = self.model.fit(self.x_train.iloc[train_indices],
-                                     self.y_train[train_indices],
-                                     batch_size=self.params.batch_size,
-                                     epochs=self.params.epochs,
-                                     verbose=1)
+            history = model.fit(self.x_train.values[train_indices],
+                                self.y_train.values[train_indices],
+                                batch_size=self.params.batch_size,
+                                epochs=self.params.epochs,
+                                verbose=1)
 
-            stats.loc[:, ["val_acc", "rel_acc", "unrel_acc"]] = self.calculate_metrics(
-                self.x_train.iloc[val_indices], self.y_train[val_indices])
-
-            x, y = (
-                self.dataset
-                .iloc[val_indices]
-                .loc[self.dataset.label_quality == "reliable", ["cleaned_title", "category"]]
-                .T
-                .values
-            )
-
-            stats.loc[:, ["val_loss", "rel_loss", "unrel_loss"
-                          ]] = self.calculate_metrics(x, y)
-
-            x, y = (
-                self.dataset
-                .iloc[val_indices]
-                .loc[self.dataset.label_quality == "unreliable", ["cleaned_title", "category"]]
-                .T
-                .values
-            )
-
-            stats.loc[:, ["val_bcd_acc", "rel_bcd_acc", "unrel_bcd_acc"
-                          ]] = self.calculate_metrics(x, y)
+            # stats.loc[:, ["val_acc", "rel_acc", "unrel_acc"]] = self.calculate_metrics(
+            #     self.x_train.iloc[val_indices], self.y_train[val_indices])
+            #
+            # x, y = (
+            #     self.dataset
+            #     .iloc[val_indices]
+            #     .loc[self.dataset.label_quality == "reliable", ["cleaned_title", "category"]]
+            #     .T
+            #     .values
+            # )
+            # 
+            # stats.loc[:, ["val_loss", "rel_loss", "unrel_loss"
+            #               ]] = self.calculate_metrics(x, y)
+            # 
+            # x, y = (
+            #     self.dataset
+            #     .iloc[val_indices]
+            #     .loc[self.dataset.label_quality == "unreliable", ["cleaned_title", "category"]]
+            #     .T
+            #     .values
+            # )
+            # 
+            # stats.loc[:, ["val_bcd_acc", "rel_bcd_acc", "unrel_bcd_acc"
+            #               ]] = self.calculate_metrics(x, y)
 
 
             # Save validation accuracy and loss curves so they can be displayed
@@ -197,7 +131,7 @@ class Pipeline:
 
             # Reset model for next iteration since fit method doesn't overwrite
             # previous training iterations
-            self.model.set_weights(initial_weigths)
+            model.set_weights(initial_weigths)
 
         # Record mean accuracy and loss
         mlflow.log_metric("mean val accuracy", np.mean(stats["val_accuracy"]))
@@ -205,15 +139,15 @@ class Pipeline:
         mlflow.log_metric("mean val balanced accuracy",
                           np.mean(stats["balanced_accuracy"]))
 
-        mlflow.log_metric("mean val accuracy", np.mean(stats["rel_acc"]))
-        mlflow.log_metric("mean val loss", np.mean(stats["rel_loss"]))
-        mlflow.log_metric("mean val balanced accuracy",
-                          np.mean(stats["unrel_loss"]))
-
-        mlflow.log_metric("mean val accuracy", np.mean(stats["unrel_acc"]))
-        mlflow.log_metric("mean val loss", np.mean(stats["unrel_loss"]))
-        mlflow.log_metric("mean val balanced accuracy",
-                          np.mean(stats["unrel_bcd_acc"]))
+        # mlflow.log_metric("mean val accuracy", np.mean(stats["rel_acc"]))
+        # mlflow.log_metric("mean val loss", np.mean(stats["rel_loss"]))
+        # mlflow.log_metric("mean val balanced accuracy",
+        #                   np.mean(stats["unrel_loss"]))
+        #
+        # mlflow.log_metric("mean val accuracy", np.mean(stats["unrel_acc"]))
+        # mlflow.log_metric("mean val loss", np.mean(stats["unrel_loss"]))
+        # mlflow.log_metric("mean val balanced accuracy",
+        #                   np.mean(stats["unrel_bcd_acc"]))
 
     def calculate_metrics(self, x, y):
         # Evaluate in validation data
@@ -266,8 +200,6 @@ class Pipeline:
         self.load_data()
         self.preprocess_data()
         self.split_data()
-        self.encode_data()
-        self.select_model()
         self.k_fold_cross_validation()
         self.evaluate_model()
         self.save_predictions()

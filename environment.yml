@@ -10,6 +10,7 @@ dependencies:
   - unidecode
   - scikit-learn
   - tensorflow
+  - gensim
   - pip
   - pip:
     - mlflow

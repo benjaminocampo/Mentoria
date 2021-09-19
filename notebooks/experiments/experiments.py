@@ -42,7 +42,7 @@ class Params:
     embedding_dim = 50
     embedding_url = "https://www.famaf.unc.edu.ar/~nocampo043/fasttext_sp_pt.vec"
     embedding_type = "custom"
-    nof_samples = 2000
+    nof_samples = 20000
     test_size = 0.2
     epochs = 20
     dataset_url = "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"
@@ -84,32 +84,23 @@ pipeline.x_test
 pipeline.y_test
 # %% [markdown]
 """
-## Códificación de titulos, confección de word embeddings (`encode_data`)
-"""
-# %%
-pipeline.encode_data()
-# %%
-pipeline.vectorize_layer
-# %%
-pipeline.vocab_size
-# %%
-pipeline.y_train
-# %%
-pipeline.y_test
-# %% [markdown]
-"""
-## Selección de modelos predefinidos (`select_model`)
-"""
-# %%
-pipeline.select_model()
-# %%
-pipeline.model.summary()
-# %% [markdown]
-"""
 ## Partición en train y validación. Obtención de métricas (`k_fold_cross_validation`)
 """
 # %%
-pipeline.k_fold_cross_validation()
+from models import baseline_model
+
+nof_classes = len(pipeline.y_train.unique())
+length_long_sentence = (
+    pipeline.dataset["cleaned_title"]
+        .apply(lambda s: s.split())
+        .apply(lambda s: len(s))
+        .max()
+)
+embedding_dim = 50
+model = baseline_model(pipeline.x_train, nof_classes, length_long_sentence, embedding_dim)
+
+# %%
+pipeline.k_fold_cross_validation(model)
 # %% [markdown]
 """
 ## Evaluación el modelo. Obtención de métricas (`evaluate_model`)
