@@ -52,6 +52,7 @@ def create_embedding_layer(vocab_size, embedding_dim, embedding_matrix,
 def baseline_model(vectorize_layer, embedding_layer, nof_classes):
     model = Sequential()
     model.add(Input(shape=(1,), dtype=tf.string))
+    # Agregar preprocesamiento
     model.add(vectorize_layer)
     model.add(embedding_layer)
     model.add(Dense(units=256, activation="relu"))

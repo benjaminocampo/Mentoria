@@ -42,7 +42,7 @@ class Params:
     embedding_dim = 50
     embedding_url = "https://www.famaf.unc.edu.ar/~nocampo043/fasttext_sp_pt.vec"
     embedding_type = "custom"
-    nof_samples = 20000
+    nof_samples = 2000
     test_size = 0.2
     epochs = 20
     dataset_url = "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"

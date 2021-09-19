@@ -136,9 +136,17 @@ class Pipeline:
         initial_weigths = self.model.get_weights()
 
         # Init validation metric recorders
-        val_accuracy = []
-        val_loss = []
-        val_balanced_accuracy = []
+        stats = pd.DataFrame(columns=[
+            "val_acc",
+            "rel_acc",
+            "unrel_acc",
+            "val_loss",
+            "rel_loss",
+            "unrel_loss",
+            "val_bcd_acc",
+            "rel_bcd_acc",
+            "unrel_bcd_acc"
+        ])
 
         # Split on training to get cross-validation sets
         skf = StratifiedKFold(n_splits=self.params.kfolds, shuffle=False)
@@ -151,26 +159,31 @@ class Pipeline:
                                      epochs=self.params.epochs,
                                      verbose=1)
 
-            # Evaluate in validation data
-            loss, accuracy = self.model.evaluate(
-                self.x_train.iloc[val_indices],
-                self.y_train[val_indices],
-                batch_size=self.params.batch_size,
-                verbose=1)
+            stats.loc[:, ["val_acc", "rel_acc", "unrel_acc"]] = self.calculate_metrics(
+                self.x_train.iloc[val_indices], self.y_train[val_indices])
 
-            # Predict validation labels
-            y_pred = np.argmax(self.model.predict(
-                self.x_train.iloc[val_indices]),
-                               axis=-1)
+            x, y = (
+                self.dataset
+                .iloc[val_indices]
+                .loc[self.dataset.label_quality == "reliable", ["cleaned_title", "category"]]
+                .T
+                .values
+            )
 
-            # Calculate balanced accuracy
-            balanced_accuracy = balanced_accuracy_score(
-                self.y_train[val_indices], y_pred)
+            stats.loc[:, ["val_loss", "rel_loss", "unrel_loss"
+                          ]] = self.calculate_metrics(x, y)
 
-            # Record accuracy, loss, and balanced accuracy
-            val_accuracy.append(accuracy)
-            val_loss.append(loss)
-            val_balanced_accuracy.append(balanced_accuracy)
+            x, y = (
+                self.dataset
+                .iloc[val_indices]
+                .loc[self.dataset.label_quality == "unreliable", ["cleaned_title", "category"]]
+                .T
+                .values
+            )
+
+            stats.loc[:, ["val_bcd_acc", "rel_bcd_acc", "unrel_bcd_acc"
+                          ]] = self.calculate_metrics(x, y)
+
 
             # Save validation accuracy and loss curves so they can be displayed
             # by mlflow
@@ -187,10 +200,34 @@ class Pipeline:
             self.model.set_weights(initial_weigths)
 
         # Record mean accuracy and loss
-        mlflow.log_metric("mean val accuracy", np.mean(val_accuracy))
-        mlflow.log_metric("mean val loss", np.mean(val_loss))
+        mlflow.log_metric("mean val accuracy", np.mean(stats["val_accuracy"]))
+        mlflow.log_metric("mean val loss", np.mean(stats["val_loss"]))
         mlflow.log_metric("mean val balanced accuracy",
-                          np.mean(balanced_accuracy))
+                          np.mean(stats["balanced_accuracy"]))
+
+        mlflow.log_metric("mean val accuracy", np.mean(stats["rel_acc"]))
+        mlflow.log_metric("mean val loss", np.mean(stats["rel_loss"]))
+        mlflow.log_metric("mean val balanced accuracy",
+                          np.mean(stats["unrel_loss"]))
+
+        mlflow.log_metric("mean val accuracy", np.mean(stats["unrel_acc"]))
+        mlflow.log_metric("mean val loss", np.mean(stats["unrel_loss"]))
+        mlflow.log_metric("mean val balanced accuracy",
+                          np.mean(stats["unrel_bcd_acc"]))
+
+    def calculate_metrics(self, x, y):
+        # Evaluate in validation data
+        loss, accuracy = self.model.evaluate(x,
+                                             y,
+                                             batch_size=self.params.batch_size,
+                                             verbose=1)
+        # Predict validation labels
+        y_pred = np.argmax(self.model.predict(x), axis=-1)
+        # Calculate balanced accuracy
+        balanced_accuracy = balanced_accuracy_score(y, y_pred)
+
+        return loss, accuracy, balanced_accuracy
+
 
     def evaluate_model(self):
         # Train model again but this time using all training data
@@ -200,19 +237,8 @@ class Pipeline:
                                  epochs=self.params.epochs,
                                  verbose=1)
 
-        # Evaluate in testing data
-        test_loss, test_accuracy = self.model.evaluate(
-            self.x_test,
-            self.y_test,
-            batch_size=self.params.batch_size,
-            verbose=1)
-
-        # Predict test labels
-        y_pred = np.argmax(self.model.predict(self.x_test), axis=-1)
-
-        # Calculate balanced accuracy
-        test_balanced_accuracy = balanced_accuracy_score(self.y_test, y_pred)
-
+        test_accuracy, test_loss, test_balanced_accuracy = self.calculate_metrics(
+            self.x_test, self.y_test)
         # Save testing accuracy and loss curves so they can be displayed
         # by mlflow
         for epoch in range(self.params.epochs):
