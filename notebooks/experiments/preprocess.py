@@ -1,6 +1,8 @@
 import re
+import pandas as pd
 from nltk import (corpus, tokenize, download)
 from unidecode import unidecode
+from encoding import encode_labels
 
 download("stopwords")
 download('punkt')
@@ -50,3 +52,24 @@ def clean_text(s: str, language: str) -> str:
     s = remove_symbols(s)
     s = remove_stopwords(s, language)
     return s
+
+
+def load_data(url, nof_samples):
+    # Read dataset
+    df = pd.read_csv(url)
+    # Sample df only when it is given by command line
+    if nof_samples is not None:
+        df = df.sample(nof_samples)
+    return df
+
+
+def preprocess_data(df):
+    # Remove numbers, symbols, special chars, contractions, etc.
+    cleaned_title_col = df[["title", "language"
+                                      ]].apply(lambda x: clean_text(*x),
+                                               axis=1)
+    # Add @cleaned_title column to df
+    df = df.assign(cleaned_title=cleaned_title_col)
+    df = df.assign(
+        encoded_category=encode_labels(df["category"]))
+    return df

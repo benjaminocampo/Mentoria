@@ -30,26 +30,43 @@ completo para evitar realizar el entrenamiento completo.
 # %%
 import mlflow
 from mlflow.tracking import MlflowClient
-from dataclasses import dataclass
-from pipeline import Pipeline
+from preprocess import load_data, preprocess_data
+from sklearn.model_selection import train_test_split
+from models import build_model
+from train import k_fold_cross_validation
 # %%
-@dataclass
-class Params:
-    model:str
-    kfolds = 5
-    seed = 0
-    batch_size = 128
-    embedding_dim = 50
-    embedding_url = "https://www.famaf.unc.edu.ar/~nocampo043/fasttext_sp_pt.vec"
-    embedding_type = "custom"
-    nof_samples = 20000
-    test_size = 0.2
-    epochs = 20
-    dataset_url = "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"
+kfolds = 5
+seed = 0
+batch_size = 128
+embedding_dim = 50
+embedding_url = "https://www.famaf.unc.edu.ar/~nocampo043/fasttext_sp_pt.vec"
+embedding_type = "custom"
+nof_samples = 1000
+test_size = 0.2
+epochs = 20
+dataset_url = "https://www.famaf.unc.edu.ar/~nocampo043/ml_challenge2019_dataset.csv"
+# %%
+df = load_data(dataset_url, nof_samples)
+df = preprocess_data(df)
+# %%
+x = df["cleaned_title"]
+y = df["encoded_category"]
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=seed)
+# %%
+length_long_sentence = (
+    df["cleaned_title"]
+        .apply(lambda s: s.split())
+        .apply(lambda s: len(s))
+        .max()
+)
 
+hyper_model = lambda hp: build_model(hp, x, length_long_sentence)
+
+best_model = k_fold_cross_validation(x_train, y_train, hyper_model)
 # %%
-params = Params(model="base")
-pipeline = Pipeline(params)
+evaluate_model(best_model)
+
+save_predictions(best_model)
 # %% [markdown]
 """
 ## Carga de datos (`load_data`)
