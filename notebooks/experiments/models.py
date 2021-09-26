@@ -1,95 +1,127 @@
-import numpy as np
+from embedding import create_embedding_matrix, create_embedding_layer
+from encoding import create_vectorize_layer
+from gensim.models import Word2Vec
 from keras.models import Sequential
-from keras.layers import Embedding, Dense, Flatten, Dropout, BatchNormalization
-from typing import List
-from tqdm import tqdm
-from urllib.request import urlopen
-import pdb
+from keras.layers import Input, Dense, Dropout, Bidirectional, LSTM, Flatten
+from keras.optimizers import Adam
+import tensorflow as tf
 
 
-def load_embedding(url: str, vocab: List[str],
-                   embedding_dim: int) -> np.array:
-    """
-    Given a path in your local system of an embedding file where each line has
-    the embedded vector of dimension @embedding_dim separated by spaces, returns
-    an embedding that contains only the words in @vocab.
-    """
-    vocab_size = len(vocab) + 1
-    nof_hits = 0
-    nof_misses = 0
 
-    embedding_indexes = {}
-    # Read embedding vectors from @filename and save them in a dictionary
-    f = urlopen(url)
-    _, _ = map(int, f.readline().split())
-    for line in tqdm(f):
-        line = line.decode("utf-8")
-        word, *coef = line.rstrip().split(' ')
-        embedding_indexes[word] = np.asarray(coef, dtype=float)
+def build_model(hp, sentences, length_long_sentence):
+    # Parameters
+    hp_units_dense = hp.Int("units_dense", min_value=32, max_value=512, step=32)
+    hp_dropout = hp.Float("dropout", 0.1, .6, sampling="log")
+    # hp_units_LSTM = hp.Int("units_LSTM", min_value=32, max_value=512, step=32)
+    hp_lr = hp.Float("lr", 1e-4, 1e-1, sampling="log")
+    embedding_dim = 100
 
-    # Use previous dictionary to look up the words in @vocab so they are
-    # assigned a vector
-    embedding_matrix = np.zeros((vocab_size, embedding_dim))
-    for index, word in tqdm(enumerate(vocab)):
-        vector = embedding_indexes.get(word)
-        if vector is not None:
-            embedding_matrix[index] = vector
-            nof_hits += 1
-        else:
-            nof_misses += 1
+    # Vectorize Layer
 
-    return embedding_matrix, nof_hits, nof_misses
+    vectorize_layer = create_vectorize_layer(length_long_sentence, "int")
+    vectorize_layer.adapt(sentences.to_numpy())
+    vocab = vectorize_layer.get_vocabulary()
+
+    # Embedding Layer
+
+    w2v = Word2Vec(sentences=[s.split() for s in sentences.to_numpy()],
+                   min_count=10,
+                   window=2,
+                   vector_size=embedding_dim,
+                   alpha=0.03,
+                   min_alpha=0.0007,
+                   negative=5)
+
+    embedding_matrix = create_embedding_matrix(w2v.wv, vocab, 100)
+
+    embedding_layer = create_embedding_layer(vocab_size=len(vocab) + 1,
+                                             embedding_dim=embedding_dim,
+                                             embedding_matrix=embedding_matrix,
+                                             input_length=length_long_sentence)
+
+    # Model definition
+    model = Sequential()
+    model.add(Input(shape=(1,), dtype=tf.string))
+    model.add(vectorize_layer)
+    model.add(embedding_layer)
+    model.add(Dense(units=hp_units_dense, activation="relu"))
+    model.add(Flatten())
+    model.add(Dense(units=20, activation="softmax"))
+
+    model.compile(loss="sparse_categorical_crossentropy",
+                  optimizer=Adam(learning_rate=hp_lr),
+                  metrics=["accuracy"])
+    
+    return model
 
 
-def create_embedding_layer(vocab_size, embedding_dim, embedding_matrix,
-                           input_length):
-    return Embedding(vocab_size,
-                     embedding_dim,
-                     weights=[embedding_matrix],
-                     trainable=False,
-                     input_length=input_length)
+def feed_forward_model(data, nof_classes, length_long_sentence, embedding_dim):
+    vectorize_layer = create_vectorize_layer(length_long_sentence, "int")
+    vectorize_layer.adapt(data.values)
 
+    vocab = vectorize_layer.get_vocabulary()
+    w2v_model = Word2Vec(sentences=data.apply(lambda s: s.split()),
+                         min_count=10,
+                         window=2,
+                         vector_size=embedding_dim,
+                         alpha=0.03,
+                         min_alpha=0.0007,
+                         negative=5)
 
-def baseline_model(embedding_layer, nof_classes):
-    baseline = Sequential()
-    baseline.add(embedding_layer)
-    baseline.add(Dense(units=256, activation="relu"))
-    baseline.add(Dense(units=128, activation="relu"))
-    baseline.add(Flatten())
-    baseline.add(Dense(units=nof_classes, activation="softmax"))
+    embedding_matrix = create_embedding_matrix(w2v_model.wv, vocab, embedding_dim)
 
-    baseline.compile(loss="sparse_categorical_crossentropy",
+    embedding_layer = create_embedding_layer(vocab_size=len(vocab) + 1,
+                                             embedding_dim=embedding_dim,
+                                             embedding_matrix=embedding_matrix,
+                                             input_length=length_long_sentence)
+
+    model = Sequential()
+    model.add(Input(shape=(1,), dtype=tf.string))
+    model.add(vectorize_layer)
+    model.add(embedding_layer)
+    model.add(Dense(units=768, activation="relu", init="uniform"))
+    model.add(Dropout(rate=.4))
+    model.add(Dense(units=384, activation="relu", init="uniform"))
+    model.add(Dropout(rate=.4))
+    model.add(Dense(units=nof_classes, activation="softmax"))
+
+    model.compile(loss="sparse_categorical_crossentropy",
                      optimizer="adam",
                      metrics=["accuracy"])
-    return baseline
+    return model
 
 
-def baseline_with_dropout_model(embedding_layer, nof_classes):
-    baseline = Sequential()
-    baseline.add(embedding_layer)
-    baseline.add(Dense(units=256, activation="relu"))
-    baseline.add(Dropout(rate=.4))
-    baseline.add(Dense(units=128, activation="relu"))
-    baseline.add(Dropout(rate=.4))
-    baseline.add(Dense(units=nof_classes, activation="softmax"))
-    baseline.add(Flatten())
+def LSTM_model(data, nof_classes, length_long_sentence,
+                              embedding_dim):
+    vectorize_layer = create_vectorize_layer(length_long_sentence, "int")
+    vectorize_layer.adapt(data.values)
 
-    baseline.compile(loss="sparse_categorical_crossentropy",
+    vocab = vectorize_layer.get_vocabulary()
+    w2v_model = Word2Vec(sentences=data.apply(lambda s: s.split()),
+                         min_count=10,
+                         window=2,
+                         vector_size=embedding_dim,
+                         alpha=0.03,
+                         min_alpha=0.0007,
+                         negative=5)
+
+    embedding_matrix = create_embedding_matrix(w2v_model.wv, vocab,
+                                               embedding_dim)
+
+    embedding_layer = create_embedding_layer(vocab_size=len(vocab) + 1,
+                                             embedding_dim=embedding_dim,
+                                             embedding_matrix=embedding_matrix,
+                                             input_length=length_long_sentence)
+
+    model = Sequential()
+    model.add(Input(shape=(1,), dtype=tf.string))
+    model.add(vectorize_layer)
+    model.add(embedding_layer)
+    model.add(Bidirectional(LSTM(256)))
+    model.add(Dense(units=128, activation="relu"))
+    model.add(Dense(units=nof_classes, activation="softmax"))
+
+    model.compile(loss="sparse_categorical_crossentropy",
                      optimizer="adam",
                      metrics=["accuracy"])
-    return baseline
-
-def baseline_with_batchnorm_model(embedding_layer, nof_classes):
-    baseline = Sequential()
-    baseline.add(embedding_layer)
-    baseline.add(Dense(units=256, activation="relu"))
-    baseline.add(BatchNormalization())
-    baseline.add(Dense(units=128, activation="relu"))
-    baseline.add(BatchNormalization())
-    baseline.add(Dense(units=nof_classes, activation="softmax"))
-    baseline.add(Flatten())
-
-    baseline.compile(loss="sparse_categorical_crossentropy",
-                     optimizer="adam",
-                     metrics=["accuracy"])
-    return baseline
+    return model

@@ -50,6 +50,10 @@ import numpy as np
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Flatten, Embedding, Dot
 from tensorflow.keras.preprocessing import text, sequence
+from tensorflow.keras.layers.experimental.preprocessing import TextVectorization
+
+from keras.models import Sequential
+from keras.layers import Input
 
 from sklearn.preprocessing import LabelEncoder
 from unidecode import unidecode
@@ -257,6 +261,8 @@ los títulos del conjunto de datos (Puede demorar algunos minutos).
 # %%
 df["title"].sample(5)
 # %%
+df = df.sample(5000, random_state=0)
+# %%
 df = df.assign(cleaned_title=df[["title", "language"]].apply(
     lambda x: clean_text(*x), axis=1))
 df[["title", "cleaned_title"]]
@@ -323,6 +329,37 @@ encoded_titles[:5]
 encoded_titles.shape
 # %% [markdown]
 """
+## Codificación de títulos usando TextVectorizer
+
+También se puede incluir la tokenización de palabras dentro del modelo por medio
+una instancia de `TextVectorization`. Definiendo la cantidad de *tokens* o
+palabras de nuestro vocabulario `max_tokens`, un tipo de codificación
+`output_mode`, y el tamaño de la secuencia más larga, `output_sequence_length`,
+se puede definir una capa `vectorize_layer` donde se realicen los pasos
+descriptos en la subsección anterior como parte del modelo.
+"""
+# %%
+length_long_sentence = (
+    df["cleaned_title"]
+        .apply(lambda s: s.split())
+        .apply(lambda s: len(s)).max()
+)
+max_tokens = len(word_tokenizer.word_index)
+vectorize_layer = TextVectorization(
+    max_tokens=max_tokens,
+    output_mode='int',
+    output_sequence_length=length_long_sentence)
+# %% [markdown]
+"""
+De manera similar a `word_tokenizer`, debemos entrenar la capa pero esta vez
+usando el método `adapt` con los títulos que son de interés.
+"""
+# %%
+vectorize_layer.adapt(df["cleaned_title"].values)
+encoded_titles = vectorize_layer(df["cleaned_title"])
+encoded_titles[:5]
+# %% [markdown]
+"""
 ## Codificación de etiquetas: *Label encoding*
 
 De igual manera que para los títulos, se necesitó codificar sus categorías
@@ -375,8 +412,8 @@ la dimensión de los vectores representación.
 """
 # %%
 _, long_sentence_size = encoded_titles.shape
-nof_dim_out_of_vocab = 1
-vocab_size = len(word_tokenizer.word_index) + nof_dim_out_of_vocab
+# %%
+vocab_size = len(vectorize_layer.get_vocabulary())
 output_dim = 64
 # %% [markdown]
 """
@@ -430,7 +467,7 @@ nof_negative_skipgrams = 4
 batch_size = 1024
 buffer_size = 10000
 dataset = generate_skipgram_training_data(
-    sequences=encoded_titles,
+    sequences=encoded_titles.numpy(),
     window_size=2,
     num_ns=4,
     vocab_size=vocab_size,
@@ -499,6 +536,25 @@ embedding_dim = 300
 embedding_layer, nof_hits, nof_misses = load_embedding(filename, vocab, embedding_dim)
 # %%
 embedding_layer.embeddings_initializer.value
+# %% [markdown]
+"""
+## Combinación de capas de preprocesamiento y embedding
+Finalmente, se puede definir un modelo que realice primero la tokenización y luego su representación
+usando las *embedding layers* *pretrained* o *custom*.
+"""
+# %%
+embedding_layer = Embedding(len(vectorize_layer.get_vocabulary()),
+                            embedding_dim,
+                            weights=[weights],
+                            trainable=False)
+
+model = Sequential()
+model.add(Input(shape=(1,), dtype=tf.string))
+model.add(vectorize_layer)
+model.add(embedding_layer)
+# %%
+input_data = df["cleaned_title"]
+model.predict(input_data)
 # %% [markdown]
 """
 ## Conclusión
