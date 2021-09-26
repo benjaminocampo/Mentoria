@@ -1,19 +1,78 @@
+
+# %% [markdown]
+# Una vez finalizadas las etapas de visualización de datos, preprocesamiento, y
+# codificación, sobre el conjunto de datos dado por el ML Challenge 2019, se
+# almacenó dicho dataset de manera remota facilitar su acceso durante los
+# experimentos que se trabajarán durante esta sección.
+#
+# Las modificaciones y decisiones de diseño tomadas durante las etapas
+# anteriores pueden encontrarse en los directorios `exploration`, y `encoding`.
+# %% [markdown]
+# ## Reproducción en Google Colab
+# Esta notebook puede ejecutarse de manera local utilizando un entorno de
+# `conda` por medio del archivo de configuración `environment.yml` ubicado en la
+# raíz del proyecto o bien de manera online por medio de `Google Colab`. Para
+# este último, es necesario ejecutar la siguiente celda con las dependencias
+# necesarias.
 # %%
 # !pip install mlflow
 # !pip install keras
 # !pip install gensim --upgrade
+# %% [markdown]
+# ## Imports
+# Dado que el objetivo de este proyecto es estimar la categoría a la cual
+# pertenece un título de una publicación de Mercado Libre. Se desarrolló un
+# *pipeline* de ejecución a partir del conjunto de datos preprocesado.
+#
+# ![Pipeline](pipeline.png)
+# 
+# Las capas de vectorización y embedding fueron llevadas a fondo en las
+# secciones preprocesamiento y codificación de títulos, permitiendo proyectar
+# los títulos de las publicaciones en un espacio N dimensional que preservando
+# la semántica de las palabras.
+#
+# El foco de esta sección, que denominamos `modeling`, consiste en encontrar el
+# modelo o clasificador que obtenga el mejor `balanced_accuracy` en la
+# clasificación de las publicaciones. Dicha métrica es la que interesa mejorar
+# durante la competencia y será relevante durante la búsqueda de
+# hiperparametros.
+#
+# La ejecución de uno o más procesos en este *pipeline* es lo que definiremos
+# como un experimento, donde propondremos como hipótesis una configuración sobre
+# el segundo y tercer paso. Para llevar esto acabo, se utilizó la librería
+# mlflow que permite registrar métricas y parámetros, junto a un nombre de
+# experimento.
+# 
+# A su vez, varias funciones *helper* fueron definidas en respectivos archivos
+# para facilitar la implementación del *pipeline*
+#
+# Estos se disponen en:
+#
+# - `models.py`: Definición de la arquitectura de las redes neuronales usadas.
+# - `embedding.py`: Generación de *in-domain* embeddings y extracción de
+#   codificaciones *pre-trained*.
+# - `preprocess.py`: Herramientas de preprocesamiento de texto para los títulos
+#   del *dataset*.
+# - `encoding.py`: Codificación de títulos y etiquetas.
 # %%
+# MLflow
 import mlflow
+# Pandas
 import pandas as pd
+# Keras
 from keras.wrappers.scikit_learn import KerasClassifier
+# Sklearn
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import balanced_accuracy_score, accuracy_score
 from sklearn.utils.fixes import loguniform
+# Scipy
 from scipy.stats import uniform, randint
-
+# Utils
 from models import ff_model, lstm_model
-
+# TODO: KerasClassifier internal implementation uses .predict when searching for
+# hyperparameters. Since this utility is deprecated this warning is displayed
+# during tuning.
 import warnings
 warnings.filterwarnings("module", category=DeprecationWarning)
 # %%
