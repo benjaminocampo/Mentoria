@@ -54,15 +54,6 @@ def clean_text(s: str, language: str) -> str:
     return s
 
 
-def load_data(url, nof_samples):
-    # Read dataset
-    df = pd.read_csv(url)
-    # Sample df only when it is given by command line
-    if nof_samples is not None:
-        df = df.sample(nof_samples)
-    return df
-
-
 def preprocess_data(df):
     # Remove numbers, symbols, special chars, contractions, etc.
     cleaned_title_col = df[["title", "language"
@@ -72,4 +63,5 @@ def preprocess_data(df):
     df = df.assign(cleaned_title=cleaned_title_col)
     df = df.assign(
         encoded_category=encode_labels(df["category"]))
+    df = df.dropna()
     return df
