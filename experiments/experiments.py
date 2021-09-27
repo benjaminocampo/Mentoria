@@ -23,7 +23,7 @@
 # pertenece un título de una publicación de Mercado Libre. Se desarrolló un
 # *pipeline* de ejecución a partir del conjunto de datos preprocesado.
 #
-# ![Pipeline](pipeline.png)
+# ![Pipeline](images/pipeline.png)
 #
 # Las capas de vectorización y embedding fueron llevadas a fondo en las
 # secciones preprocesamiento y codificación de títulos, permitiendo proyectar
