@@ -68,7 +68,7 @@ from sklearn.utils.fixes import loguniform
 from scipy.stats import uniform, randint
 # Utils
 from models import ff_model, lstm_model
-# TODO: KerasClassifier internal implementation uses .predict when searching for
+# TODO: KerasClassifier internal implementation uses .predict() when searching
 # hyperparameters. Since this utility is deprecated this warning is displayed
 # during tuning.
 import warnings
@@ -80,7 +80,7 @@ warnings.filterwarnings("module", category=DeprecationWarning)
 # mismo para realizar los experimentos.
 # %%
 URL = "https://www.famaf.unc.edu.ar/~nocampo043/ML_2019_challenge_dataset_preprocessed.csv"
-NOF_SAMPLES = 20000
+NOF_SAMPLES = 10000
 SEED = 0
 
 df = pd.read_csv(URL)
@@ -141,10 +141,15 @@ mlflow.set_experiment("LSTM vs Feed Forward")
 
 with mlflow.start_run():
     build_ff = lambda units, dropout, lr, embedding_dim: ff_model(
-        x_train["cleaned_title"], length_long_sentence, units, dropout, lr, embedding_dim)
+        x_train,
+        length_long_sentence,
+        units,
+        dropout,
+        lr,
+        embedding_dim)
 
     build_lstm = lambda units, dropout, lr, embedding_dim: lstm_model(
-        x_train["cleaned_title"], length_long_sentence, units, dropout, lr, embedding_dim)
+        x_train, length_long_sentence, units, dropout, lr, embedding_dim)
 
     ff = KerasClassifier(build_fn=build_ff)
 
@@ -173,12 +178,11 @@ with mlflow.start_run():
                                  scoring="balanced_accuracy",
                                  verbose=3)
 
-        clf.fit(x_train["cleaned_title"], y_train)
+        clf.fit(x_train, y_train)
 
-        y_pred = clf.best_estimator_.predict(x_test["cleaned_title"])
-        y_pred_rel = clf.best_estimator_.predict(x_test_rel["cleaned_title"])
-        y_pred_unrel = clf.best_estimator_.predict(
-            x_test_unrel["cleaned_title"])
+        y_pred = clf.best_estimator_.predict(x_test)
+        y_pred_rel = clf.best_estimator_.predict(x_test_rel)
+        y_pred_unrel = clf.best_estimator_.predict(x_test_unrel)
 
         blc_acc = balanced_accuracy_score(y_test, y_pred)
         blc_acc_rel = balanced_accuracy_score(y_test_rel, y_pred_rel)
