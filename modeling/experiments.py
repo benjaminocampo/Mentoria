@@ -1,8 +1,11 @@
 # %% [markdown]
+# # Categorización de publicaciones de productos de Mercado Libre
+# Autores: Maximiliano Tejerina, Eduardo Barseghian, Benjamín Ocampo
+# %% [markdown]
 # Una vez finalizadas las etapas de visualización de datos, preprocesamiento, y
 # codificación, sobre el conjunto de datos dado por el ML Challenge 2019, se
-# almacenó dicho dataset de manera remota facilitar su acceso durante los
-# experimentos que se trabajarán durante esta sección.
+# almacenó dicho dataset de manera remota para facilitar su acceso durante los
+# experimentos que se trabajaron durante esta sección.
 #
 # Las modificaciones y decisiones de diseño tomadas durante las etapas
 # anteriores pueden encontrarse en los directorios `exploration`, y `encoding`.
@@ -12,13 +15,13 @@
 # `conda` por medio del archivo de configuración `environment.yml` ubicado en la
 # raíz del proyecto o bien de manera online por medio de `Google Colab`. Para
 # este último, es necesario ejecutar la siguiente celda con las dependencias
-# necesarias.
+# necesarias e incluir los módulos que se encuentran en este directorio.
 # %%
 # !pip install mlflow
 # !pip install keras
 # !pip install gensim --upgrade
 # %% [markdown]
-# ## Imports
+# ## Pipeline
 # Dado que el objetivo de este proyecto es estimar la categoría a la cual
 # pertenece un título de una publicación de Mercado Libre. Se desarrolló un
 # *pipeline* de ejecución a partir del conjunto de datos preprocesado.
@@ -26,20 +29,20 @@
 # ![Pipeline](images/pipeline.png)
 #
 # Las capas de vectorización y embedding fueron llevadas a fondo en las
-# secciones preprocesamiento y codificación de títulos, permitiendo proyectar
-# los títulos de las publicaciones en un espacio N dimensional que preserva la
-# semántica de las palabras.
+# secciones preprocesamiento y codificación, permitiendo proyectar los títulos
+# de las publicaciones en un espacio N dimensional que preserva la semántica de
+# las palabras.
 #
 # El foco de esta sección, que denominamos `modeling`, consiste en encontrar el
 # modelo o clasificador que obtenga el mejor `balanced_accuracy` en la
-# clasificación de las publicaciones. Dicha métrica es la que interesa mejorar
+# clasificación de las publicaciones. Dicha métrica es la que nos interesa mejorar
 # durante la competencia y será relevante durante la búsqueda de
 # hiperparametros.
 #
 # La ejecución de uno o más procesos en este *pipeline* es lo que definiremos
 # como un experimento, donde propondremos como hipótesis una configuración sobre
 # el segundo, tercer, y cuarto paso. Finalmente, el registro de resultados se
-# llevó acabo por medio de la librería mlflow sobre el último paso.
+# llevó a cabo de la librería mlflow sobre el último paso.
 #
 # A su vez, varias funciones *helper* fueron definidas en respectivos archivos
 # para facilitar la implementación del *pipeline*.
@@ -47,11 +50,13 @@
 # Estos se disponen en:
 #
 # - `models.py`: Definición de la arquitectura de las redes neuronales usadas.
-# - `embedding.py`: Generación de *in-domain* embeddings y extracción de
+# - `embedding.py`: Generación de *in-domain embeddings* y extracción de
 #   codificaciones *pre-trained*.
 # - `preprocess.py`: Herramientas de preprocesamiento de texto para los títulos
 #   del *dataset*.
 # - `encoding.py`: Codificación de títulos y etiquetas.
+# %% [markdown]
+# ## Librerias
 # %%
 # MLflow
 import mlflow
@@ -69,7 +74,7 @@ from scipy.stats import uniform, randint
 # Utils
 from models import ff_model, lstm_model
 # TODO: KerasClassifier internal implementation uses .predict() when searching
-# hyperparameters. Since this utility is deprecated this warning is displayed
+# hyperparameters. Since this utility is deprecated, this warning is displayed
 # during tuning.
 import warnings
 warnings.filterwarnings("module", category=DeprecationWarning)
@@ -90,11 +95,11 @@ df
 # ## Train-Test Split
 # Durante la separación en conjuntos de *train* y *test*, se definió
 # inicialmente la variable objetivo `y = "encoded_category"` sin especificar las
-# caracteristicas. Esto fue para mantener la estructura de datos en la que se
-# encuentran almacenados los ejemplares, y se permita filtrar diferenciar de
-# manera sencilla los conjuntos de *train* y de *test*, por *label_quality*. De
-# esta manera, se pudo discriminar el *balanced_accuracy_score* en *test* para
-# estos dos subconjuntos.
+# características. Esto fue para mantener la estructura de datos en la que se
+# encuentran almacenados los ejemplares, y se permita filtrar de manera sencilla
+# los conjuntos de *train* y de *test*, por *label_quality*. De esta manera, se
+# pudo discriminar el *balanced_accuracy_score* en *test* para estos dos
+# subconjuntos.
 # %%
 y = df["encoded_category"]
 df_train, df_test, y_train, y_test = train_test_split(df,
@@ -117,24 +122,24 @@ x_test_rel = df_test_rel["cleaned_title"]
 x_test_unrel = df_test_unrel["cleaned_title"]
 # %% [markdown]
 # ## Padding
-# Dado que en los titulos de las publicaciones la cantidad de palabras que
+# Dado que en los títulos de las publicaciones la cantidad de palabras que
 # ocurren varía, es necesario extender los vectores representantes a un ancho
 # común, en este caso, el de la oración más larga.
 # %%
 length_long_sentence = (df["cleaned_title"].apply(lambda s: s.split()).apply(
     lambda s: len(s)).max())
 # %% [markdown]
-# LSTM vs Feed Forward (lstm_vs_ff)
+# ## LSTM vs Feed Forward (lstm_vs_ff)
 # El experimento a evaluar en esta notebook consta de la comparación de dos
 # modelos:
 # - Red LSTM (lstm)
 # - Red Feed Forward (ff)
 #
-# Ambos cuentan con capas de vectorización, embedding, aprendizaje, dropout, y
+# Ambos cuentan con capas de vectorización, *embedding*, aprendizaje, *dropout*, y
 # predicción diferenciandose en la de aprendizaje. Estas son una `Bidirectional
 # LSTM layer` y una `Dense layer` respectivamente.
 #
-# Para la busqueda de parámetros se utilizó una `Randomized Search CV` bajo la
+# Para la busqueda de parámetros se utilizó una `Randomized Search CV` bajo las
 # mismas distribuciones en ambos modelos.
 # %%
 mlflow.set_experiment("LSTM vs Feed Forward")
