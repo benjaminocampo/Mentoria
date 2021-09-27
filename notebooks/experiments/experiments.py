@@ -1,4 +1,3 @@
-
 # %% [markdown]
 # Una vez finalizadas las etapas de visualización de datos, preprocesamiento, y
 # codificación, sobre el conjunto de datos dado por el ML Challenge 2019, se
@@ -25,11 +24,11 @@
 # *pipeline* de ejecución a partir del conjunto de datos preprocesado.
 #
 # ![Pipeline](pipeline.png)
-# 
+#
 # Las capas de vectorización y embedding fueron llevadas a fondo en las
 # secciones preprocesamiento y codificación de títulos, permitiendo proyectar
-# los títulos de las publicaciones en un espacio N dimensional que preservando
-# la semántica de las palabras.
+# los títulos de las publicaciones en un espacio N dimensional que preserva la
+# semántica de las palabras.
 #
 # El foco de esta sección, que denominamos `modeling`, consiste en encontrar el
 # modelo o clasificador que obtenga el mejor `balanced_accuracy` en la
@@ -39,12 +38,11 @@
 #
 # La ejecución de uno o más procesos en este *pipeline* es lo que definiremos
 # como un experimento, donde propondremos como hipótesis una configuración sobre
-# el segundo y tercer paso. Para llevar esto acabo, se utilizó la librería
-# mlflow que permite registrar métricas y parámetros, junto a un nombre de
-# experimento.
-# 
+# el segundo, tercer, y cuarto paso. Finalmente, el registro de resultados se
+# llevó acabo por medio de la librería mlflow sobre el último paso.
+#
 # A su vez, varias funciones *helper* fueron definidas en respectivos archivos
-# para facilitar la implementación del *pipeline*
+# para facilitar la implementación del *pipeline*.
 #
 # Estos se disponen en:
 #
@@ -75,29 +73,69 @@ from models import ff_model, lstm_model
 # during tuning.
 import warnings
 warnings.filterwarnings("module", category=DeprecationWarning)
+# %% [markdown]
+# ## Sampling de datos
+# Debido al gran tamaño de muestras disponibles (por encima de los 600000
+# ejemplares), se optó por considerar únicamente un subconjunto aleatorio del
+# mismo para realizar los experimentos.
 # %%
 URL = "https://www.famaf.unc.edu.ar/~nocampo043/ML_2019_challenge_dataset_preprocessed.csv"
 NOF_SAMPLES = 20000
 SEED = 0
 
 df = pd.read_csv(URL)
-df.sample(n=NOF_SAMPLES, random_state=SEED)
+df = df.sample(n=NOF_SAMPLES, random_state=SEED)
+df
+# %% [markdown]
+# ## Train-Test Split
+# Durante la separación en conjuntos de *train* y *test*, se definió
+# inicialmente la variable objetivo `y = "encoded_category"` sin especificar las
+# caracteristicas. Esto fue para mantener la estructura de datos en la que se
+# encuentran almacenados los ejemplares, y se permita filtrar diferenciar de
+# manera sencilla los conjuntos de *train* y de *test*, por *label_quality*. De
+# esta manera, se pudo discriminar el *balanced_accuracy_score* en *test* para
+# estos dos subconjuntos.
 # %%
-x = df
 y = df["encoded_category"]
-x_train, x_test, y_train, y_test = train_test_split(x,
-                                                    y,
-                                                    test_size=0.2,
-                                                    random_state=SEED)
+df_train, df_test, y_train, y_test = train_test_split(df,
+                                                      y,
+                                                      test_size=0.2,
+                                                      random_state=SEED)
 
-x_test_unrel = x_test[x_test["label_quality"] == "unreliable"]
-y_test_unrel = x_test_unrel["encoded_category"]
-
-x_test_rel = x_test[x_test["label_quality"] == "reliable"]
-y_test_rel = x_test_rel["encoded_category"]
+df_test_unrel = df_test.loc[df_test["label_quality"] == "unreliable"]
+df_test_rel = df_test[df_test["label_quality"] == "reliable"]
+# %%
+y_test_unrel = df_test_unrel["encoded_category"]
+y_test_rel = df_test_rel["encoded_category"]
+# %% [markdown]
+# Una vez hecho esto, las *features* se obtienen proyectando la columna
+# `cleaned_title` de estos *dataframes*.
+# %%
+x_train = df_train["cleaned_title"]
+x_test = df_test["cleaned_title"]
+x_test_rel = df_test_rel["cleaned_title"]
+x_test_unrel = df_test_unrel["cleaned_title"]
+# %% [markdown]
+# ## Padding
+# Dado que en los titulos de las publicaciones la cantidad de palabras que
+# ocurren varía, es necesario extender los vectores representantes a un ancho
+# común, en este caso, el de la oración más larga.
 # %%
 length_long_sentence = (df["cleaned_title"].apply(lambda s: s.split()).apply(
     lambda s: len(s)).max())
+# %% [markdown]
+# LSTM vs Feed Forward (lstm_vs_ff)
+# El experimento a evaluar en esta notebook consta de la comparación de dos
+# modelos:
+# - Red LSTM (lstm)
+# - Red Feed Forward (ff)
+#
+# Ambos cuentan con capas de vectorización, embedding, aprendizaje, dropout, y
+# predicción diferenciandose en la de aprendizaje. Estas son una `Bidirectional
+# LSTM layer` y una `Dense layer` respectivamente.
+#
+# Para la busqueda de parámetros se utilizó una `Randomized Search CV` bajo la
+# mismas distribuciones en ambos modelos.
 # %%
 mlflow.set_experiment("LSTM vs Feed Forward")
 
@@ -122,11 +160,11 @@ with mlflow.start_run():
     }
 
     searches = [
-        (ff, dist),
-        (lstm, dist)
+        ("ff", ff, dist),
+        ("lstm", lstm, dist)
     ]
 
-    for hyper_model, dist in searches:
+    for model_name, hyper_model, dist in searches:
         mlflow.log_params(dist)
 
         clf = RandomizedSearchCV(estimator=hyper_model,
@@ -139,7 +177,8 @@ with mlflow.start_run():
 
         y_pred = clf.best_estimator_.predict(x_test["cleaned_title"])
         y_pred_rel = clf.best_estimator_.predict(x_test_rel["cleaned_title"])
-        y_pred_unrel = clf.best_estimator_.predict(x_test_unrel["cleaned_title"])
+        y_pred_unrel = clf.best_estimator_.predict(
+            x_test_unrel["cleaned_title"])
 
         blc_acc = balanced_accuracy_score(y_test, y_pred)
         blc_acc_rel = balanced_accuracy_score(y_test_rel, y_pred_rel)
@@ -158,5 +197,5 @@ with mlflow.start_run():
         mlflow.log_metric("accuracy unreliable", acc_unrel)
 
         predictions = pd.DataFrame(data={"y_pred": y_pred, "y_test": y_test})
-        predictions.to_csv(f"predictions.csv", index=False)
+        predictions.to_csv(f"{model_name}_predictions.csv", index=False)
 # %%
