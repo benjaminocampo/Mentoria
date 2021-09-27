@@ -209,3 +209,11 @@ with mlflow.start_run():
         predictions = pd.DataFrame(data={"y_pred": y_pred, "y_test": y_test})
         predictions.to_csv(f"{model_name}_predictions.csv", index=False)
 # %%
+!mlflow ui
+# %% [markdown]
+# Para una cantidad de ejemplares de 10000, se obtuvo mejores resultados con la red Feed Forward
+# en balanced_accuracy en los conjuntos reliable, unreliable, y sin filtro alguno.
+# Con aproximadamente 0.70 para la `ff` y de 0.40 para `lstm`. Estos resultados probablemente
+# se hayan dado debido al muestreo donde algunas de las clases de no fue vista durante entrenamiento.
+# A su vez, debido a la capacidad de las redes lstm de poder visualizar en mayor medida
+# el contexto en una oración, se esperaría tener mejores resultados alterando la arquitectura de la red.
