@@ -2,7 +2,7 @@ from embedding import create_embedding_matrix, create_embedding_layer
 from encoding import create_vectorize_layer
 from gensim.models import Word2Vec
 from keras.models import Sequential
-from keras.layers import Input, Dense, Dropout, Bidirectional, LSTM, Flatten
+from keras.layers import Input, Dense, Dropout, LSTM, Flatten
 from tensorflow.keras.optimizers import Adam
 import tensorflow as tf
 
@@ -72,7 +72,7 @@ def lstm_model(sentences, length_long_sentence, units, dropout, lr,
     model.add(Input(shape=(1,), dtype=tf.string))
     model.add(vectorize_layer)
     model.add(embedding_layer)
-    model.add(Bidirectional(LSTM(units=units)))
+    model.add(LSTM(units=units))
     model.add(Dropout(rate=dropout))
     model.add(Flatten())
     model.add(Dense(units=20, activation="softmax"))

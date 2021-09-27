@@ -20,6 +20,8 @@
 # !pip install mlflow
 # !pip install keras
 # !pip install gensim --upgrade
+# !pip install scikit-learn==0.21.2
+# !pip install numpy==0.19
 # %% [markdown]
 # ## Pipeline
 # Dado que el objetivo de este proyecto es estimar la categoría a la cual
@@ -68,9 +70,8 @@ from keras.wrappers.scikit_learn import KerasClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import balanced_accuracy_score, accuracy_score
-from sklearn.utils.fixes import loguniform
 # Scipy
-from scipy.stats import uniform, randint
+from scipy.stats import uniform, randint, loguniform
 # Utils
 from models import ff_model, lstm_model
 # TODO: KerasClassifier internal implementation uses .predict() when searching
@@ -85,7 +86,7 @@ warnings.filterwarnings("module", category=DeprecationWarning)
 # mismo para realizar los experimentos.
 # %%
 URL = "https://www.famaf.unc.edu.ar/~nocampo043/ML_2019_challenge_dataset_preprocessed.csv"
-NOF_SAMPLES = 10000
+NOF_SAMPLES = 2000
 SEED = 0
 
 df = pd.read_csv(URL)
@@ -135,9 +136,9 @@ length_long_sentence = (df["cleaned_title"].apply(lambda s: s.split()).apply(
 # - Red LSTM (lstm)
 # - Red Feed Forward (ff)
 #
-# Ambos cuentan con capas de vectorización, *embedding*, aprendizaje, *dropout*, y
-# predicción diferenciandose en la de aprendizaje. Estas son una `Bidirectional
-# LSTM layer` y una `Dense layer` respectivamente.
+# Ambos cuentan con capas de vectorización, *embedding*, aprendizaje, *dropout*,
+# y predicción diferenciandose en la de aprendizaje. Estas son una `LSTM layer`
+# y una `Dense layer` respectivamente.
 #
 # Para la busqueda de parámetros se utilizó una `Randomized Search CV` bajo las
 # mismas distribuciones en ambos modelos.
@@ -170,8 +171,8 @@ with mlflow.start_run():
     }
 
     searches = [
-        ("ff", ff, dist),
-        ("lstm", lstm, dist)
+        ("lstm", lstm, dist),
+        ("ff", ff, dist)
     ]
 
     for model_name, hyper_model, dist in searches:
