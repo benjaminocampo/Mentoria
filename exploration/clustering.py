@@ -1,26 +1,15 @@
-# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
-#     cell_markers: '"""'
-#     formats: ipynb,py:percent
 #     text_representation:
 #       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.11.3
+#       format_name: light
+#       format_version: '1.5'
+#       jupytext_version: 1.13.0
 #   kernelspec:
-#     display_name: Python 3
-#     language: python
+#     display_name: 'Python 3.9.6 64-bit (''datasc'': conda)'
 #     name: python3
 # ---
-
-# %% [markdown]
-"""
- # Categorización de publicaciones de productos de Mercado Libre
-
- Autores: Maximiliano Tejerina, Eduardo Barseghian, Benjamín Ocampo
-"""
 # %%
 import pandas as pd
 import fasttext
@@ -30,6 +19,10 @@ from adjustText import adjust_text
 from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans
 
+from sklearn.cluster import MiniBatchKMeans
+from sklearn.metrics import silhouette_samples, silhouette_score
+#help(fasttext.FastText)
+# %%
 URL = "https://www.famaf.unc.edu.ar/~nocampo043/ML_2019_challenge_dataset_preprocessed.csv"
 NOF_SAMPLES = 20000
 SEED = 0
@@ -101,11 +94,13 @@ def plot_vocabulary_kmeans(X_TSNE,
 # %%
 df = pd.read_csv(URL)
 df = df.sample(n=NOF_SAMPLES, random_state=SEED)
+df = df.sort_values(by="category").reset_index()
+df = df.sort_values(by="language").reset_index()
 df
 # %%
 sentences = df["cleaned_title"].tolist()
 corpus_file = "titles.txt"
-
+# %%
 unsupervised_data_gen(sentences, corpus_file)
 # %%
 model = fasttext.train_unsupervised(corpus_file,
@@ -115,23 +110,25 @@ model = fasttext.train_unsupervised(corpus_file,
                                     dim=100,
                                     wordNgrams=3,
                                     ws=3)
-
 # %%
-model.get_dimension()
+model.get_dimension(
 # %%
 model.get_words()[:30]
 # %%
+model.get_nearest_neighbors("barbero")
+# %%
 model.get_nearest_neighbors("cafetera")
-# %% [markdown]
+# %%
 # ## Clustering a nivel de palabra
 # %%
+# %matplotlib inline
 vocab = model.get_words()
 embedding = get_embedding(vocab, model)
 embedding_TSNE = get_embedding_2DTSNE(vocab, model)
 X = embedding.drop(columns=["word"]).to_numpy()
 X_TSNE = embedding_TSNE.drop(columns=["word"]).to_numpy()
 # %%
-kmeans = KMeans(n_clusters=4)
+kmeans = KMeans(n_clusters=20, algorithm='elkan')
 kmeans.fit(X)
 
 _, (ax_kmeans, ax_tsne) = plt.subplots(1, 2, figsize=(30, 10))
@@ -139,7 +136,126 @@ plot_vocabulary_2DTSNE(X_TSNE, vocab, ax_tsne)
 plot_vocabulary_kmeans(X_TSNE, kmeans, ax_kmeans)
 ax_kmeans.grid()
 ax_tsne.grid()
-# %% [markdown]
-# ## Clustering a nivel de título (oración)
 # %%
+import matplotlib.cm as cm
 
+range_n_clusters = [16, 18, 20]
+sse ={}
+for n_clusters in range_n_clusters:
+    # Create a subplot with 1 row and 2 columns
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig.set_size_inches(18, 7)
+
+    # The 1st subplot is the silhouette plot
+    # The silhouette coefficient can range from -1, 1 but in this example all
+    # lie within [-0.1, 1]
+    ax1.set_xlim([-0.1, 1])
+    # The (n_clusters+1)*10 is for inserting blank space between silhouette
+    # plots of individual clusters, to demarcate them clearly.
+    ax1.set_ylim([0, len(X) + (n_clusters + 1) * 10])
+
+    # Initialize the clusterer with n_clusters value and a random generator
+    # seed of 10 for reproducibility.
+    clusterer = KMeans(n_clusters=n_clusters, algorithm='elkan')
+    cluster_labels = clusterer.fit_predict(X)
+    sse[n_clusters] = clusterer.inertia_
+
+    # The silhouette_score gives the average value for all the samples.
+    # This gives a perspective into the density and separation of the formed
+    # clusters
+    silhouette_avg = silhouette_score(X, cluster_labels)
+    print("Para n_clusters =", n_clusters,
+          "El silhouette_score promedio es :", silhouette_avg)
+
+    # Compute the silhouette scores for each sample
+    sample_silhouette_values = silhouette_samples(X, cluster_labels)
+
+    y_lower = 10
+    for i in range(n_clusters):
+        # Aggregate the silhouette scores for samples belonging to
+        # cluster i, and sort them
+        ith_cluster_silhouette_values = \
+            sample_silhouette_values[cluster_labels == i]
+
+        ith_cluster_silhouette_values.sort()
+
+        size_cluster_i = ith_cluster_silhouette_values.shape[0]
+        y_upper = y_lower + size_cluster_i
+
+        color = cm.nipy_spectral(float(i) / n_clusters)
+        ax1.fill_betweenx(np.arange(y_lower, y_upper),
+                          0, ith_cluster_silhouette_values,
+                          facecolor=color, edgecolor=color, alpha=0.7)
+
+        # Label the silhouette plots with their cluster numbers at the middle
+        ax1.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
+
+        # Compute the new y_lower for next plot
+        y_lower = y_upper + 10  # 10 for the 0 samples
+
+    ax1.set_title("Visualizacion de los datos.")
+    ax1.set_xlabel("espacio de la primera caracteristica")
+    ax1.set_ylabel("espacio de la segunda caracteristica")
+
+    # The vertical line for average silhouette score of all the values
+    ax1.axvline(x=silhouette_avg, color="red", linestyle="--")
+
+    ax1.set_yticks([])  # Clear the yaxis labels / ticks
+    ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
+
+
+    # 2nd Plot showing the actual clusters formed
+    colors = cm.nipy_spectral(cluster_labels.astype(float) / n_clusters)
+    ax2.scatter(X[:, 0], X[:, 1], marker='.', s=30, lw=0, alpha=0.7,
+                c=colors, edgecolor='k')
+
+    # Labeling the clusters
+    centers = clusterer.cluster_centers_
+    # Draw white circles at cluster centers
+    ax2.scatter(centers[:, 0], centers[:, 1], marker='o',
+                c="white", alpha=1, s=200, edgecolor='k')
+
+    for i, c in enumerate(centers):
+        ax2.scatter(c[0], c[1], marker='$%d$' % i, alpha=1,
+                    s=50, edgecolor='k')
+
+    ax2.set_title("Visualizacion de los datos.")
+    ax2.set_xlabel("espacio de la primera caracteristica")
+    ax2.set_ylabel("espacio de la segunda caracteristica")
+
+    plt.suptitle(("Analisis de silueta para Kmedias "
+                  "con n_clusters = %d" % n_clusters),
+                 fontsize=14, fontweight='bold')
+    #plt.savefig("kmeans_%d" % n_clusters, dpi=300)
+
+plt.show()
+
+fig, (ax1, ax2) = plt.subplots(1, 2)
+fig.set_size_inches(18, 7)
+plt.suptitle(("Metodo del codo para kmedias "),
+                 fontsize=14, fontweight='bold')
+ax1.plot(list(sse.keys()), list(sse.values()))
+ax1.set_xlabel("Numero of cluster")
+ax1.set_ylabel("Inercia")
+
+clusterer = KMeans(n_clusters=4, random_state=10)
+cluster_labels = clusterer.fit_predict(X)
+    
+colors = cm.nipy_spectral(cluster_labels.astype(float) / 4)
+ax2.scatter(X[:, 0], X[:, 1], marker='.', s=30, lw=0, alpha=0.7,c=colors, edgecolor='k')
+
+# Labeling the clusters
+centers = clusterer.cluster_centers_
+    # Draw white circles at cluster centers
+ax2.scatter(centers[:, 0], centers[:, 1], marker='o',c="white", alpha=1, s=200, edgecolor='k')
+
+for i, c in enumerate(centers):
+    ax2.scatter(c[0], c[1], marker='$%d$' % i, alpha=1,s=50, edgecolor='k')
+
+ax2.set_title("Visualizacion de los datos.")
+ax2.set_xlabel("espacio de la primera caracteristica")
+ax2.set_ylabel("espacio de la segunda caracteristica")
+
+#plt.savefig("kmeans_elbow", dpi=300)
+plt.show()
+# %%
