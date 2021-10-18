@@ -15,10 +15,10 @@ import pandas as pd
 import fasttext
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 from adjustText import adjust_text
 from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_samples, silhouette_score
 from yellowbrick.cluster import SilhouetteVisualizer, KElbowVisualizer
 # %%
 URL = "https://www.famaf.unc.edu.ar/~nocampo043/ML_2019_challenge_dataset_preprocessed.csv"
@@ -98,11 +98,14 @@ def plot_2D_kmeans(X_TSNE,
                    marker_size=2,
                    legend_size=20,
                    tick_size=20):
-    for k in range(km_model.n_clusters):
-        ax.scatter(X_TSNE[km_model.labels_ == k, 0],
-                   X_TSNE[km_model.labels_ == k, 1],
-                   s=point_size,
-                   label=k)
+    cluster_df = pd.DataFrame(X_TSNE)
+    cluster_df = cluster_df.assign(label=km_model.labels_)
+    # for k in range(km_model.n_clusters):
+    #     ax.scatter(X_TSNE[km_model.labels_ == k, 0],
+    #                X_TSNE[km_model.labels_ == k, 1],
+    #                s=point_size,
+    #                label=k)
+    sns.scatterplot(data=cluster_df, x=0, y=1, hue="label", palette="tab20", ax=ax)
     ax.legend(bbox_to_anchor=(1.02, 1.02),
               loc='upper left',
               markerscale=marker_size,
@@ -112,7 +115,7 @@ def plot_2D_kmeans(X_TSNE,
 
 
 def plot_silhouette(X, km_model, ax, title_size=20, tick_size=20):
-    visualizer = SilhouetteVisualizer(km_model, colors='yellowbrick', ax=ax)
+    visualizer = SilhouetteVisualizer(km_model, colors='tab20', ax=ax)
     visualizer.fit(X)
     ax.set_title("Silhoutte Plot", fontsize=title_size)
     ax.tick_params(axis='both', which='major', labelsize=tick_size)
@@ -124,7 +127,7 @@ def plot_elbow(X, estimator, metric, k_range, ax, title_size=10, tick_size=10):
                                   timings=False,
                                   ax=ax)
     visualizer.fit(X)
-    ax.set_title("Silhoutte Plot", fontsize=title_size)
+    ax.set_title("Elbow Plot", fontsize=title_size)
     ax.tick_params(axis='both', which='major', labelsize=tick_size)
 
 
