@@ -1,15 +1,3 @@
-# ---
-# jupyter:
-#   jupytext:
-#     text_representation:
-#       extension: .py
-#       format_name: light
-#       format_version: '1.5'
-#       jupytext_version: 1.13.0
-#   kernelspec:
-#     display_name: 'Python 3.9.6 64-bit (''datasc'': conda)'
-#     name: python3
-# ---
 # %% [markdown]
 # # Categorización de publicaciones de productos de Mercado Libre
 # Autores: Maximiliano Tejerina, Eduardo Barseghian, Benjamín Ocampo
