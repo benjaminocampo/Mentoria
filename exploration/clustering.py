@@ -148,7 +148,7 @@ def plot_elbow(X, estimator, metric, k_range, ax, title_size=10, tick_size=10):
 # %%
 df = pd.read_csv(URL)
 df = df.sample(n=NOF_SAMPLES, random_state=SEED)
-df
+df = df.drop_duplicates(subset="cleaned_title")
 # %% [markdown]
 # Inicialmente se proyectó la columna `cleaned_title` con los títulos de las
 # publicaciones ya preprocesadas siendo esta el corpus que se trabajó.
@@ -239,7 +239,7 @@ plt.show()
 # Para esta sección se obtuvo el embedding de una oración tomando las
 # representaciones individuales de cada palabra que la componen, dividiendo esos
 # vectores por su norma y considerando el promedio de ellas. Esto realiza
-# internamente FastText por medio de `get_sentence_vector`. 
+# internamente FastText por medio de `get_sentence_vector`.
 # %%
 embedding = get_sentence_embedding(sentences, model.get_sentence_vector)
 embedding_TSNE = get_sentence_embedding_2DTSNE(sentences,
@@ -247,13 +247,35 @@ embedding_TSNE = get_sentence_embedding_2DTSNE(sentences,
 X = embedding.drop(columns=["sentence"]).to_numpy()
 X_TSNE = embedding_TSNE.drop(columns=["sentence"]).to_numpy()
 # %%
+embedding
+# %%
+embedding_TSNE
+# %% [markdown]
+# ## Elbow Method
+# Con el fin de seleccionar la cantidad óptima de clusters, una de las
+# estrategias usadas fue el `Elbow Method` que consiste en seleccionar un rango
+# de valores `k_range` ajustando el modelo de `KMeans`. Con ello confeccionamos
+# un gráfico de linea de tal manera que, si este se asemeja al de un codo,
+# entonces el punto de inflección de la curva es un buen indicador de cual es el
+# mejor modelo. La métrica utilizada en este caso fue `distortion` que consiste
+# en la suma de las distancias al cuadrado de cada punto al centro de los
+# clusters.
+# %%
 fig, ax_elbow = plt.subplots()
 k_range = (2, 20)
 plot_elbow(X, KMeans, "distortion", k_range, ax_elbow)
 plt.show()
+# %% [markdown]
+# Si bien no se encuentra ningun codo pronunciado, el algoritmo encuentra que la
+# cantidad óptima es de 11 clusters.
 # %%
 kmeans = KMeans(n_clusters=11)
 kmeans.fit(X)
+# %% [markdown]
+# ## Silhouette
+# Una vez ajustado para la cantidad de clusters dada con el método anterior se
+# utilizó el método de silhouette junto a una visualización de los clusters
+# ajustada en las 100 dimensiones aproximada en 2D usando TSNE.
 # %%
 _, (ax_silhouette, ax_kmeans) = plt.subplots(1, 2, figsize=(30, 10))
 plot_silhouette(X, kmeans, ax_silhouette)
@@ -261,3 +283,70 @@ plot_2D_kmeans(X_TSNE, kmeans, ax_kmeans)
 ax_silhouette.grid()
 ax_kmeans.grid()
 plt.show()
+# %% [markdown]
+# Notar que el coeficiente de silhouette promedio de cada uno de los clusters es
+# de aproximadamente 0.1.
+# %% [markdown]
+# ## Top 10 categorías más presentes en cada cluster
+# %%
+df = df.assign(cluster=kmeans.labels_)
+# %%
+df_cross = pd.crosstab(df["category"], df["cluster"])
+df_cross
+# %%
+for cluster in df_cross:
+    print(df_cross[cluster].sort_values(ascending=False).head(10))
+# %% [markdown]
+# Notar que para cada uno de los tops hay categorias que tienen una pequeña
+# cantidad de ejemplares. Por lo tanto solo consideraremos aquellas que superen
+# los 100.
+# %%
+for cluster in df_cross:
+    print(
+        df_cross
+        .loc[df_cross[cluster] > 100, cluster]
+        .sort_values(ascending=False)
+    )
+    print()
+# %% [markdown]
+# Solo algunos cluster se puede comentar que podrían llegar a tener alguna
+# relación en cuanto a su significado. Tales son el caso de los clusters:
+#  0: Relacionado a elementos de cocina.
+#  2: Productos para bebé.
+#  5: Ropa.
+#  7 y 9: Nuevamente elementos de cocina y ropa.
+# %% [markdown]
+# ## Porcentaje de títulos a cada cluster
+# De manera similar podemos obtener, para cada categoría, el porcentaje de
+# títulos que pertence a cada cluster. Obteniendo una representación similar a
+# la anterior
+# %%
+df_cross_percent = pd.crosstab(df["category"], df["cluster"], normalize="index")
+df_cross_percent
+# %%
+for cluster in df_cross_percent:
+    print(df_cross_percent[cluster].sort_values(ascending=False).head(10))
+# %% [markdown]
+# Nuevamente podemos optar por considerar solo aquellas categorías con un
+# porcentaje superior a un umbral, en este caso a 0.1.
+# %%
+for cluster in df_cross_percent:
+    print(
+        df_cross_percent
+        .loc[df_cross_percent[cluster] > 0.1, cluster]
+        .sort_values(ascending=False)
+    )
+    print()
+# %% [markdown]
+# ## Conclusiones
+# Algunos desafios con los que nos encontramos es la posibilidad de utilizar el
+# conjunto completo de datos para realizar los experimentos. Una posibilidad
+# para mejorar el modelo de lenguaje obtenido sería utilizar todos los
+# ejemplares en lugar de un sampleo.
+#
+# Los resultados obtenidos con los embeddings de FastText para los títulos
+# tampoco fueron muy significativos para obtener alguna conclusión sólida de los
+# agrupamientos. Una posiblidad podría ser probar distintos parámetros del
+# modelo de lenguaje o utilizar otros métodos de vectorización (BOW, matriz
+# de co-ocurrencia, triplas de dependencia, etc) de tal manera de poder
+# compararlos.
