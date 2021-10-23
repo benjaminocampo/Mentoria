@@ -19,9 +19,6 @@
 # %%
 # !pip install mlflow
 # !pip install keras
-# !pip install gensim --upgrade
-# !pip install scikit-learn==0.21.2
-# !pip install numpy==0.19
 # %% [markdown]
 # ## Pipeline
 # Dado que el objetivo de este proyecto es estimar la categoría a la cual
@@ -64,21 +61,15 @@
 import mlflow
 # Pandas
 import pandas as pd
-# Keras
-from keras.wrappers.scikit_learn import KerasClassifier
 # Sklearn
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import balanced_accuracy_score, accuracy_score
+from sklearn.pipeline import Pipeline
 # Scipy
 from scipy.stats import uniform, randint, loguniform
 # Utils
-from models import ff_model, lstm_model
-# TODO: KerasClassifier internal implementation uses .predict() when searching
-# hyperparameters. Since this utility is deprecated, this warning is displayed
-# during tuning.
-import warnings
-warnings.filterwarnings("module", category=DeprecationWarning)
+from transformers import FastTextVectorizer
+from models import FeedForward_Net, LSTM_Net
 # %% [markdown]
 # ## Sampling de datos
 # Debido al gran tamaño de muestras disponibles (por encima de los 600000
@@ -122,14 +113,6 @@ x_test = df_test["cleaned_title"]
 x_test_rel = df_test_rel["cleaned_title"]
 x_test_unrel = df_test_unrel["cleaned_title"]
 # %% [markdown]
-# ## Padding
-# Dado que en los títulos de las publicaciones la cantidad de palabras que
-# ocurren varía, es necesario extender los vectores representantes a un ancho
-# común, en este caso, el de la oración más larga.
-# %%
-length_long_sentence = (df["cleaned_title"].apply(lambda s: s.split()).apply(
-    lambda s: len(s)).max())
-# %% [markdown]
 # ## LSTM vs Feed Forward (lstm_vs_ff)
 # El experimento a evaluar en esta notebook consta de la comparación de dos
 # modelos:
@@ -143,71 +126,50 @@ length_long_sentence = (df["cleaned_title"].apply(lambda s: s.split()).apply(
 # Para la busqueda de parámetros se utilizó una `Randomized Search CV` bajo las
 # mismas distribuciones en ambos modelos.
 # %%
-mlflow.set_experiment("LSTM vs Feed Forward")
+def hyper_tune(model, param_grid):
+    clf = GridSearchCV(estimator=model,
+                       param_grid=param_grid,
+                       cv=5,
+                       scoring="balanced_accuracy",
+                       verbose=3)
+    clf.fit(x_train, y_train)
+    y_pred = clf.best_estimator_.predict(x_test)
+    y_pred_rel = clf.best_estimator_.predict(x_test_rel)
+    y_pred_unrel = clf.best_estimator_.predict(x_test_unrel)
+    predictions = [y_pred, y_pred_rel, y_pred_unrel]
+    clf.cv_results_["best_blc_acc"] = balanced_accuracy_score(y_test, y_pred)
+    clf.cv_results_["best_blc_acc_rel"] = balanced_accuracy_score(y_test_rel, y_pred_rel)
+    clf.cv_results_["best_blc_acc_unrel"] = balanced_accuracy_score(y_test_unrel, y_pred_unrel)
+    clf.cv_results_["best_acc"] = accuracy_score(y_test, y_pred)
+    clf.cv_results_["best_acc_rel"] = accuracy_score(y_test_rel, y_pred_rel)
+    clf.cv_results_["best_acc_unrel"] = accuracy_score(y_test_unrel, y_pred_unrel)
+    return clf.best_estimator_, predictions, clf.best_params_.get_params(), clf.cv_results_
 
-with mlflow.start_run():
-    build_ff = lambda units, dropout, lr, embedding_dim: ff_model(
-        x_train,
-        length_long_sentence,
-        units,
-        dropout,
-        lr,
-        embedding_dim)
+def save_metrics(best_model, best_params, param_grid, results):
+    mlflow.best_params(best_params)
+    mlflow.log_metrics(results)
 
-    build_lstm = lambda units, dropout, lr, embedding_dim: lstm_model(
-        x_train, length_long_sentence, units, dropout, lr, embedding_dim)
+def save_predictions(filename, y_pred, y_test):
+    predictions = pd.DataFrame(data={"y_pred": y_pred, "y_test": y_test})
+    predictions.to_csv(filename, index=False)
 
-    ff = KerasClassifier(build_fn=build_ff)
+def save_confusion_matrix():
+    pass
 
-    lstm = KerasClassifier(build_fn=build_lstm)
-
-    dist = {
-        "batch_size": [100, 1000],
-        "epochs": [5, 10],
-        "units": randint(256, 512),
-        "lr": loguniform(1e-4, 1e-1),
-        "dropout": uniform(.1, .6),
-        "embedding_dim": randint(50, 200)
-    }
-
-    searches = [
-        ("lstm", lstm, dist),
-        ("ff", ff, dist)
-    ]
-
-    for model_name, hyper_model, dist in searches:
-        mlflow.log_params(dist)
-
-        clf = RandomizedSearchCV(estimator=hyper_model,
-                                 param_distributions=dist,
-                                 cv=5,
-                                 scoring="balanced_accuracy",
-                                 verbose=3)
-
-        clf.fit(x_train, y_train)
-
-        y_pred = clf.best_estimator_.predict(x_test)
-        y_pred_rel = clf.best_estimator_.predict(x_test_rel)
-        y_pred_unrel = clf.best_estimator_.predict(x_test_unrel)
-
-        blc_acc = balanced_accuracy_score(y_test, y_pred)
-        blc_acc_rel = balanced_accuracy_score(y_test_rel, y_pred_rel)
-        blc_acc_unrel = balanced_accuracy_score(y_test_unrel, y_pred_unrel)
-
-        acc = accuracy_score(y_test, y_pred)
-        acc_rel = accuracy_score(y_test_rel, y_pred_rel)
-        acc_unrel = accuracy_score(y_test_unrel, y_pred_unrel)
-
-        mlflow.log_metric("balanced_accuracy", blc_acc)
-        mlflow.log_metric("balanced_accuracy reliable", blc_acc_rel)
-        mlflow.log_metric("balanced_accuracy unreliable", blc_acc_unrel)
-
-        mlflow.log_metric("accuracy", acc)
-        mlflow.log_metric("accuracy reliable", acc_rel)
-        mlflow.log_metric("accuracy unreliable", acc_unrel)
-
-        predictions = pd.DataFrame(data={"y_pred": y_pred, "y_test": y_test})
-        predictions.to_csv(f"{model_name}_predictions.csv", index=False)
+# %%
+model = Pipeline([
+    ("vectorizer", FastTextVectorizer()),
+    ("model", FeedForward_Net())
+])
+param_grid = {
+    "model__batch_size": [100, 1000],
+    "model__epochs": [5, 10],
+    "model__units": [256, 512],
+    "model__lr": [1e-4, 1e-1],
+    "model__dropout": [.1, .6],
+}
+# %%
+best_model, predictions, best_params, results = hyper_tune(model, param_grid)
 # %%
 !mlflow ui
 # %% [markdown]

@@ -1,6 +1,9 @@
 name: diplodatos-mentorship
+channels:
+  - conda-forge
+  - districtdatalabs
 dependencies:
-  - numpy==0.19
+  - numpy
   - pandas
   - matplotlib
   - statsmodels
@@ -8,7 +11,7 @@ dependencies:
   - nltk
   - keras
   - unidecode
-  - scikit-learn==0.21.2
+  - scikit-learn
   - tensorflow
   - gensim
   - yellowbrick
