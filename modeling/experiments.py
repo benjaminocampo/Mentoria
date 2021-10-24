@@ -57,16 +57,16 @@
 # %% [markdown]
 # ## Librerias
 # %%
-# MLflow
-import mlflow
 # Pandas
 import pandas as pd
+# Seaborn
+import seaborn as sns
+# Matplotlib
+import matplotlib.pyplot as plt
 # Sklearn
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import balanced_accuracy_score, accuracy_score
-from sklearn.pipeline import Pipeline
-# Scipy
-from scipy.stats import uniform, randint, loguniform
+from sklearn.metrics import balanced_accuracy_score, confusion_matrix
+from sklearn.linear_model import LogisticRegression
 # Utils
 from transformers import FastTextVectorizer
 from models import FeedForward_Net, LSTM_Net
@@ -77,7 +77,7 @@ from models import FeedForward_Net, LSTM_Net
 # mismo para realizar los experimentos.
 # %%
 URL = "https://www.famaf.unc.edu.ar/~nocampo043/ML_2019_challenge_dataset_preprocessed.csv"
-NOF_SAMPLES = 2000
+NOF_SAMPLES = 20000
 SEED = 0
 
 df = pd.read_csv(URL)
@@ -112,70 +112,149 @@ x_train = df_train["cleaned_title"]
 x_test = df_test["cleaned_title"]
 x_test_rel = df_test_rel["cleaned_title"]
 x_test_unrel = df_test_unrel["cleaned_title"]
+
+length_longest_sentence = int(df["cleaned_title"].apply(lambda title: len(title.split())).max())
 # %% [markdown]
-# ## LSTM vs Feed Forward (lstm_vs_ff)
-# El experimento a evaluar en esta notebook consta de la comparación de dos
+# ## 
+# El experimento a evaluar en esta notebook consta de la comparación de tres
 # modelos:
+#
+# - LogisticRegression (lgr)
 # - Red LSTM (lstm)
 # - Red Feed Forward (ff)
 #
-# Ambos cuentan con capas de vectorización, *embedding*, aprendizaje, *dropout*,
-# y predicción diferenciandose en la de aprendizaje. Estas son una `LSTM layer`
-# y una `Dense layer` respectivamente.
-#
-# Para la busqueda de parámetros se utilizó una `Randomized Search CV` bajo las
-# mismas distribuciones en ambos modelos.
+# Para la busqueda de parámetros se utilizó una `Grid Search CV` bajo el mismo
+# espacio de busqueda en las redes neuronales
+# %% [markdown]
+# ## Baseline
+vector_dim = 100
+transformer = FastTextVectorizer(dim=vector_dim, return_sequences=False)
+transformer.fit(x_train)
+x_train_arr = transformer.transform(x_train)
+x_test_arr = transformer.transform(x_test)
+x_test_rel_arr = transformer.transform(x_test_rel)
+x_test_unrel_arr = transformer.transform(x_test_unrel)
 # %%
-def hyper_tune(model, param_grid):
-    clf = GridSearchCV(estimator=model,
-                       param_grid=param_grid,
-                       cv=5,
-                       scoring="balanced_accuracy",
-                       verbose=3)
-    clf.fit(x_train, y_train)
-    y_pred = clf.best_estimator_.predict(x_test)
-    y_pred_rel = clf.best_estimator_.predict(x_test_rel)
-    y_pred_unrel = clf.best_estimator_.predict(x_test_unrel)
-    predictions = [y_pred, y_pred_rel, y_pred_unrel]
-    clf.cv_results_["best_blc_acc"] = balanced_accuracy_score(y_test, y_pred)
-    clf.cv_results_["best_blc_acc_rel"] = balanced_accuracy_score(y_test_rel, y_pred_rel)
-    clf.cv_results_["best_blc_acc_unrel"] = balanced_accuracy_score(y_test_unrel, y_pred_unrel)
-    clf.cv_results_["best_acc"] = accuracy_score(y_test, y_pred)
-    clf.cv_results_["best_acc_rel"] = accuracy_score(y_test_rel, y_pred_rel)
-    clf.cv_results_["best_acc_unrel"] = accuracy_score(y_test_unrel, y_pred_unrel)
-    return clf.best_estimator_, predictions, clf.best_params_.get_params(), clf.cv_results_
-
-def save_metrics(best_model, best_params, param_grid, results):
-    mlflow.best_params(best_params)
-    mlflow.log_metrics(results)
-
-def save_predictions(filename, y_pred, y_test):
-    predictions = pd.DataFrame(data={"y_pred": y_pred, "y_test": y_test})
-    predictions.to_csv(filename, index=False)
-
-def save_confusion_matrix():
-    pass
-
-# %%
-model = Pipeline([
-    ("vectorizer", FastTextVectorizer()),
-    ("model", FeedForward_Net())
-])
+model = LogisticRegression()
 param_grid = {
-    "model__batch_size": [100, 1000],
-    "model__epochs": [5, 10],
-    "model__units": [256, 512],
-    "model__lr": [1e-4, 1e-1],
-    "model__dropout": [.1, .6],
+    "C": [1, 0.1, 0.001],
+    "penalty": ["elasticnet"],
+    "class_weight": ["balanced"],
+    "random_state": [0],
+    "solver": ["saga"],
+    "l1_ratio": [0, 1, 0.5]
 }
 # %%
-best_model, predictions, best_params, results = hyper_tune(model, param_grid)
+clf = GridSearchCV(estimator=model,
+                   param_grid=param_grid,
+                   cv=5,
+                   scoring="balanced_accuracy",
+                   verbose=3)
+clf.fit(x_train_arr, y_train)
 # %%
-!mlflow ui
+clf.best_estimator_.predict(x_test_arr)
+y_pred = clf.best_estimator_.predict(x_test_arr)
+y_pred_rel = clf.best_estimator_.predict(x_test_rel_arr)
+y_pred_unrel = clf.best_estimator_.predict(x_test_unrel_arr)
+blc_acc = balanced_accuracy_score(y_test, y_pred)
+blc_acc_rel = balanced_accuracy_score(y_test_rel, y_pred_rel)
+blc_acc_unrel = balanced_accuracy_score(y_test_unrel, y_pred_unrel)
+# %%
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(10, 7), dpi=600)
+cm = sns.heatmap(cm, annot=True, fmt="d")
+plt.xlabel("Predicted label")
+plt.ylabel("True label")
+plt.title("Regresión Logística")
+plt.savefig("LogisticRegression.png")
+plt.clf()
+# %%
+clf.cv_results_["best_blc_acc"] = blc_acc
+clf.cv_results_["best_blc_acc_rel"] = blc_acc_rel
+clf.cv_results_["best_blc_acc_unrel"] = blc_acc_unrel
+results = pd.DataFrame(clf.cv_results_)
+results.to_csv("LogisticRegression.csv", index=False)
 # %% [markdown]
-# Para una cantidad de ejemplares de 10000, se obtuvo mejores resultados con la red Feed Forward
-# en balanced_accuracy en los conjuntos reliable, unreliable, y sin filtro alguno.
-# Con aproximadamente 0.70 para la `ff` y de 0.40 para `lstm`. Estos resultados probablemente
-# se hayan dado debido al muestreo donde algunas de las clases de no fue vista durante entrenamiento.
-# A su vez, debido a la capacidad de las redes lstm de poder visualizar en mayor medida
-# el contexto en una oración, se esperaría tener mejores resultados alterando la arquitectura de la red.
+# ## NNet FeedForward
+# %%
+ff_net = FeedForward_Net(vector_dim=vector_dim)
+
+param_grid = {
+    "batch_size": [100],
+    "epochs": [100],
+    "units": [256],
+    "lr": [1e-1],
+    "dropout": [.4],
+}
+clf = GridSearchCV(estimator=ff_net,
+                   param_grid=param_grid,
+                   cv=5,
+                   scoring="balanced_accuracy",
+                   verbose=3)
+clf.fit(x_train_arr, y_train)
+# %%
+y_pred = clf.best_estimator_.predict(x_test_arr)
+y_pred_rel = clf.best_estimator_.predict(x_test_rel_arr)
+y_pred_unrel = clf.best_estimator_.predict(x_test_unrel_arr)
+blc_acc = balanced_accuracy_score(y_test, y_pred)
+blc_acc_rel = balanced_accuracy_score(y_test_rel, y_pred_rel)
+blc_acc_unrel = balanced_accuracy_score(y_test_unrel, y_pred_unrel)
+# %%
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(10, 7), dpi=600)
+cm = sns.heatmap(cm, annot=True, fmt="d")
+plt.xlabel("Predicted label")
+plt.ylabel("True label")
+plt.title("Red Feed Forward")
+plt.savefig("Feed_Forward.png")
+plt.clf()
+# %%
+clf.cv_results_["best_blc_acc"] = blc_acc
+clf.cv_results_["best_blc_acc_rel"] = blc_acc_rel
+clf.cv_results_["best_blc_acc_unrel"] = blc_acc_unrel
+results = pd.DataFrame(clf.cv_results_)
+results.to_csv("FeedForward.csv", index=False)
+# %% [markdown]
+# ## Sequential LSTM Net
+# %%
+vector_dim = 100
+lstm_net = LSTM_Net(vector_dim=vector_dim,
+                    sequence_dim=length_longest_sentence,
+                    batch_size=100,
+                    epochs=100,
+                    units=256,
+                    lr=1e-1,
+                    dropout=.1)
+transformer = FastTextVectorizer(dim=vector_dim,
+                                 length_longest_sentence=length_longest_sentence,
+                                 return_sequences=True)
+transformer.fit(x_train)
+x_train_arr = transformer.transform(x_train)
+x_test_arr = transformer.transform(x_test)
+x_test_rel_arr = transformer.transform(x_test_rel)
+x_test_unrel_arr = transformer.transform(x_test_unrel)
+# %%
+lstm_net.fit(x_train_arr, y_train)
+# %%
+y_pred = lstm_net.predict(x_test_arr)
+y_pred_rel = lstm_net.predict(x_test_rel_arr)
+y_pred_unrel = lstm_net.predict(x_test_unrel_arr)
+blc_acc = balanced_accuracy_score(y_test, y_pred)
+blc_acc_rel = balanced_accuracy_score(y_test_rel, y_pred_rel)
+blc_acc_unrel = balanced_accuracy_score(y_test_unrel, y_pred_unrel)
+# %%
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(10, 7), dpi=600)
+cm = sns.heatmap(cm, annot=True, fmt="d")
+plt.xlabel("Predicted label")
+plt.ylabel("True label")
+plt.title("Red LSTM")
+plt.savefig("LSTM.png")
+plt.clf()
+# %% [markdown]
+# Para una cantidad de ejemplares de 20000, se obtuvo muy buenos resultados con
+# la red Feed Forward y nuestro Baseline en balanced_accuracy en los conjuntos
+# reliable, unreliable, y sin filtro alguno. Nos sorprendio el resultado de la
+# LSTM ya que supusimos que podía llegar a tomar ventaja de la secuencia de los
+# títulos pero no pudimos lograr que aprenda el problema. Se cree que utilizando
+# todos los datos podría llegar a mejorar los resultados de este modelo.

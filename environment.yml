@@ -3,7 +3,6 @@ channels:
   - conda-forge
   - districtdatalabs
 dependencies:
-  - numpy
   - pandas
   - matplotlib
   - statsmodels
@@ -19,3 +18,4 @@ dependencies:
   - pip:
     - mlflow
     - fasttext
+    - numpy==1.19.5

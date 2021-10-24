@@ -24,7 +24,9 @@ class FastTextVectorizer(BaseTransformer):
                  epoch=100,
                  dim=100,
                  wordNgrams=3,
-                 ws=3):
+                 ws=3,
+                 length_longest_sentence=100,
+                 return_sequences=False):
         self.corpus_file = corpus_file
         self.pretext_task = pretext_task
         self.lr = lr
@@ -32,10 +34,18 @@ class FastTextVectorizer(BaseTransformer):
         self.dim = dim
         self.wordNgrams = wordNgrams
         self.ws = ws
-        self.model = None        
+        self.model = None
+        self.length_longest_sentence = length_longest_sentence
+        self.return_sequences = return_sequences
+
+    def get_sentence_vector(self, sentence):
+        return self.model.get_sentence_vector(sentence)
 
     def get_sequence_vector(self, sentence):
-        return self.model.get_sentence_vector(sentence)
+        sequence = np.zeros((self.length_longest_sentence, self.dim))
+        for i, word in enumerate(sentence.split()):
+            sequence[i, :] = self.model.get_word_vector(word)
+        return sequence
 
     def unsupervised_data_gen(self, sentences):
         with open(self.corpus_file, "w") as out:
@@ -54,7 +64,10 @@ class FastTextVectorizer(BaseTransformer):
         return self
 
     def transform(self, sentences, y=None):
-        return np.vstack(sentences.apply(self.get_sequence_vector))
+        if self.return_sequences:
+            return np.array(sentences.apply(self.get_sequence_vector).tolist())
+        else:
+            return np.vstack(sentences.apply(self.get_sentence_vector))
 
 
 class Preprocesser(BaseTransformer):
@@ -103,7 +116,7 @@ class Preprocesser(BaseTransformer):
         s = self.remove_stopwords(s, language)
         return s
 
-    
+
     def transform(self, df):
         # Remove numbers, symbols, special chars, contractions, etc.
         cleaned_title_col = df[["title", "language"

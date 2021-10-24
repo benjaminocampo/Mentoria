@@ -1,12 +1,16 @@
 from keras.models import Sequential
-from keras.layers import Input, Dense, Dropout, LSTM, Flatten
+from keras.layers import Input, Dense, Dropout, SpatialDropout1D
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.layers import LSTM
 from sklearn.base import BaseEstimator
 import numpy as np
+import tensorflow as tf
 
 
 class LSTM_Net(BaseEstimator):
     def __init__(self,
+                 vector_dim,
+                 sequence_dim,
                  units=256,
                  dropout=0,
                  lr=1e-3,
@@ -17,18 +21,18 @@ class LSTM_Net(BaseEstimator):
         self.lr = lr
         self.batch_size = batch_size
         self.epochs = epochs
+        self.sequence_dim = sequence_dim
+        self.vector_dim = vector_dim
         self.model = Sequential()
-        self.model.add(Input(shape=(100, ), dtype=float))
+        self.model.add(Input(shape=(sequence_dim, vector_dim), dtype=float))
+        self.model.add(SpatialDropout1D(rate=dropout))
         self.model.add(LSTM(units=units))
-        self.model.add(Dropout(rate=dropout))
-        #self.model.add(Flatten())
         self.model.add(Dense(units=20, activation="softmax"))
         self.model.compile(loss="sparse_categorical_crossentropy",
                            optimizer=Adam(learning_rate=lr),
                            metrics=["accuracy"])
 
     def fit(self, X, y):
-        import pdb; pdb.set_trace()
         self.model.fit(X, y, batch_size=self.batch_size, epochs=self.epochs)
 
     def predict(self, X):
@@ -40,6 +44,7 @@ class LSTM_Net(BaseEstimator):
 
 class FeedForward_Net(BaseEstimator):
     def __init__(self,
+                 vector_dim,
                  units=256,
                  dropout=0,
                  lr=1e-3,
@@ -50,11 +55,11 @@ class FeedForward_Net(BaseEstimator):
         self.lr = lr
         self.batch_size = batch_size
         self.epochs = epochs
+        self.vector_dim = vector_dim
         self.model = Sequential()
-        self.model.add(Input(shape=(100, ), dtype=float))
+        self.model.add(Input(shape=(vector_dim, ), dtype=float))
         self.model.add(Dense(units=units, activation="relu"))
         self.model.add(Dropout(rate=dropout))
-        #self.model.add(Flatten())
         self.model.add(Dense(units=20, activation="softmax"))
         self.model.compile(loss="sparse_categorical_crossentropy",
                            optimizer=Adam(learning_rate=lr),
